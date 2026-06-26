@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: swasthanand-api
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  r2dbc:
+    url: r2dbc:mssql://localhost:1433/swasthanand?trustServerCertificate=true
+    username: sa
+    password: 123
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+
+server:
+  port: 8081
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+
+twilio:
+  account:
+    sid: ${TWILIO_ACCOUNT_SID:YOUR_TWILIO_SID}
+  auth:
+    token: ${TWILIO_AUTH_TOKEN:YOUR_TWILIO_TOKEN}
+  phone:
+    number: ${TWILIO_PHONE_NUMBER:YOUR_TWILIO_PHONE_NUMBER}

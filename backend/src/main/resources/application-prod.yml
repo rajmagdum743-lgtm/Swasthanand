@@ -1,0 +1,16 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+app:
+  admin-debug-otp: false
+  payment:
+    razorpay:
+      enabled: false
+
+# Razorpay keys are not needed in prod if disabled, or use placeholders for live keys
+razorpay:
+  key:
+    id: rzp_live_placeholders
+    secret: live_placeholder_secret

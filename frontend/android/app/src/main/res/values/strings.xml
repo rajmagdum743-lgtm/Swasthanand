@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Swasthanand</string>
+    <string name="title_activity_main">Swasthanand</string>
+    <string name="package_name">com.swasthanand.app</string>
+    <string name="custom_url_scheme">com.swasthanand.app</string>
+</resources>

@@ -1,0 +1,20 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  r2dbc:
+    url: r2dbc:mssql://localhost:1433/swasthanand?trustServerCertificate=true
+    username: sa
+    password: 123
+
+
+app:
+  admin-debug-otp: true
+  payment:
+    razorpay:
+      enabled: true
+
+razorpay:
+  key:
+    id: rzp_test_placeholder_id
+    secret: placeholder_secret
