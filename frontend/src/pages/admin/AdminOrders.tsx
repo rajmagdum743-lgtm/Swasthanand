@@ -72,16 +72,28 @@ const AdminOrders: React.FC = () => {
         fetch(`${API_BASE_URL}/api/admin/users`)
       ]);
 
+      let rawOrders: any[] = [];
+      let allUsers: UserInfo[] = [];
+
       if (ordersRes.ok) {
-        const data = await ordersRes.json();
-        data.sort((a: Order, b: Order) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setOrders(data);
+        rawOrders = await ordersRes.json();
       }
       if (usersRes.ok) {
-        const data: UserInfo[] = await usersRes.json();
-        // Keep both customers and dealers for manual ordering
-        setCustomers(data.filter(u => u.role === 'CUSTOMER' || u.role === 'DEALER'));
+        allUsers = await usersRes.json();
+        setCustomers(allUsers.filter(u => u.role === 'CUSTOMER' || u.role === 'DEALER'));
       }
+
+      // Map userId to full user object
+      const mappedOrders = rawOrders.map((o: any) => {
+        const matchingUser = allUsers.find(u => u.id === o.userId);
+        return {
+          ...o,
+          user: matchingUser || { id: o.userId, name: 'Anonymous', phone: '', role: 'CUSTOMER' }
+        };
+      });
+
+      mappedOrders.sort((a: Order, b: Order) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setOrders(mappedOrders);
     } catch (err) {
       console.error('Failed to fetch orders data', err);
     } finally {
@@ -103,9 +115,14 @@ const AdminOrders: React.FC = () => {
       });
       if (res.ok) {
         const updatedOrder = await res.json();
-        setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+        const matchingUser = customers.find(u => u.id === updatedOrder.userId);
+        const mappedUpdatedOrder = {
+          ...updatedOrder,
+          user: matchingUser || { id: updatedOrder.userId, name: 'Anonymous', phone: '', role: 'CUSTOMER' }
+        };
+        setOrders(prev => prev.map(o => o.id === orderId ? mappedUpdatedOrder : o));
         if (selectedOrder?.id === orderId) {
-          setSelectedOrder(updatedOrder);
+          setSelectedOrder(mappedUpdatedOrder);
         }
         setIsCancelModalOpen(false);
         setReason('');
@@ -182,8 +199,13 @@ const AdminOrders: React.FC = () => {
 
       if (res.ok) {
         const updated = await res.json();
-        setOrders(prev => prev.map(o => o.id === selectedOrder.id ? updated : o));
-        setSelectedOrder(updated);
+        const matchingUser = customers.find(u => u.id === updated.userId);
+        const mappedUpdated = {
+          ...updated,
+          user: matchingUser || { id: updated.userId, name: 'Anonymous', phone: '', role: 'CUSTOMER' }
+        };
+        setOrders(prev => prev.map(o => o.id === selectedOrder.id ? mappedUpdated : o));
+        setSelectedOrder(mappedUpdated);
         setIsEditingAmount(false);
         triggerNotification('Order amount updated successfully');
       } else {

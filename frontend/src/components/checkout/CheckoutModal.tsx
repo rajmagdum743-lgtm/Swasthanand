@@ -115,6 +115,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                userId: user?.id,
                 user: { id: user?.id },
                 totalAmount: totalPrice,
                 status: 'PAID',
@@ -178,6 +179,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
         setIsLoading(true);
         try {
           const orderData = {
+            userId: user?.id,
             user: { id: user?.id },
             totalAmount: totalPrice,
             status: 'PENDING',

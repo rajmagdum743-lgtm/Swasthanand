@@ -72,7 +72,8 @@ const DealerOrders: React.FC = () => {
       (filter === 'TRANSIT' && ['TRANSIT','SHIPPED'].includes(o.status)) ||
       (filter === 'COMPLETED' && o.status === 'DELIVERED');
     const q = searchQuery.toLowerCase();
-    return ok && (o.id.toLowerCase().includes(q) || o.user.name.toLowerCase().includes(q));
+    const userName = o.user?.name || '';
+    return ok && (o.id.toLowerCase().includes(q) || userName.toLowerCase().includes(q));
   });
 
   const counts = { pending: orders.filter(o => o.status === 'PENDING').length, transit: orders.filter(o => ['TRANSIT','SHIPPED'].includes(o.status)).length };
@@ -156,7 +157,7 @@ const DealerOrders: React.FC = () => {
                       <span className="text-sm font-black text-white">{ord.id}</span>
                       <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${cfg.bg} ${cfg.border} ${cfg.color}`}>{cfg.label}</span>
                     </div>
-                    <p className="text-sm font-extrabold text-slate-200">{ord.user.name}</p>
+                    <p className="text-sm font-extrabold text-slate-200">{ord.user?.name || 'Walk-in Customer'}</p>
                     <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1"><Calendar size={9} /> {date}</p>
                   </div>
                 </div>
@@ -204,10 +205,10 @@ const DealerOrders: React.FC = () => {
                       {/* Customer Info */}
                       <div className="p-4 rounded-xl border border-white/6" style={{ background: 'rgba(255,255,255,0.02)' }}>
                         <span className="block text-[9px] font-black text-emerald-400 uppercase tracking-wider mb-3">Distributor Info</span>
-                        <p className="text-sm font-extrabold text-white mb-1">{ord.user.name}</p>
-                        <p className="text-xs text-slate-400 font-medium">+91 {ord.user.phone}</p>
-                        <p className="text-xs text-slate-500 font-medium mt-1">RZP: {ord.razorpayOrderId}</p>
-                        <p className="text-xs text-slate-500 font-medium">Route: {warehouse}</p>
+                        <p className="text-sm font-extrabold text-white mb-1">{ord.user?.name || 'Walk-in Customer'}</p>
+                        <p className="text-xs text-slate-400 font-medium">+91 {ord.user?.phone || 'N/A'}</p>
+                        <p className="text-xs text-slate-500 font-medium mt-1">RZP: {ord.razorpayOrderId || 'N/A'}</p>
+                        <p className="text-xs text-slate-500 font-medium">Route: {warehouse || 'N/A'}</p>
                       </div>
 
                       {/* QC Audit */}

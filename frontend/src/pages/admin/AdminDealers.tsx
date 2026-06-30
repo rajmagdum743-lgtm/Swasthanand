@@ -18,6 +18,7 @@ interface User {
   name: string;
   phone: string;
   role: string;
+  isApproved?: boolean;
   addresses: Address[];
 }
 
@@ -34,7 +35,9 @@ const itemVariants = {
 const AdminDealers: React.FC = () => {
   const [dealers, setDealers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active');
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -63,15 +66,23 @@ const AdminDealers: React.FC = () => {
   const fetchDealers = async () => {
     try {
       setLoading(true);
+      setErrorMsg(null);
       const res = await fetch(`${API_BASE_URL}/api/admin/users`);
       if (res.ok) {
         const users: User[] = await res.json();
         // Filter out dealers only
         const dealerUsers = users.filter(u => u.role === 'DEALER');
         setDealers(dealerUsers);
+      } else {
+        if (res.status === 401 || res.status === 403) {
+          setErrorMsg('Session expired or unauthorized. Please exit/logout and log in again.');
+        } else {
+          setErrorMsg(`Error loading dealers: HTTP status ${res.status}`);
+        }
       }
     } catch (err) {
       console.error(err);
+      setErrorMsg('Network error connecting to backend.');
     } finally {
       setLoading(false);
     }
@@ -138,6 +149,40 @@ const AdminDealers: React.FC = () => {
     }
   };
 
+  const handleApproveDealer = async (dealerId: string, name: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/users/${dealerId}/approve`, {
+        method: 'PUT'
+      });
+      if (res.ok) {
+        triggerNotification(`Dealer "${name}" approved successfully`);
+        fetchDealers();
+      } else {
+        triggerNotification('Failed to approve dealer', 'error');
+      }
+    } catch (err) {
+      triggerNotification('Error connecting to backend', 'error');
+    }
+  };
+
+  const handleRejectDealer = async (dealerId: string, name: string) => {
+    if (window.confirm(`Are you sure you want to reject the registration request for "${name}"?`)) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/users/${dealerId}`, {
+          method: 'DELETE'
+        });
+        if (res.ok) {
+          triggerNotification('Dealer request rejected successfully');
+          fetchDealers();
+        } else {
+          triggerNotification('Failed to reject dealer request', 'error');
+        }
+      } catch (err) {
+        triggerNotification('Error connecting to backend', 'error');
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.phone.length < 10) {
@@ -170,7 +215,10 @@ const AdminDealers: React.FC = () => {
     }
   };
 
-  const filteredDealers = dealers.filter(d =>
+  const activeDealers = dealers.filter(d => d.isApproved !== false && (d as any).approved !== false);
+  const pendingDealers = dealers.filter(d => d.isApproved === false || (d as any).approved === false);
+
+  const filteredDealers = (activeTab === 'active' ? activeDealers : pendingDealers).filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase()) || 
     d.phone.includes(search) || 
     d.addresses.some(a => a.village.toLowerCase().includes(search.toLowerCase()) || a.district.toLowerCase().includes(search.toLowerCase()))
@@ -212,6 +260,33 @@ const AdminDealers: React.FC = () => {
         </button>
       </div>
 
+      {/* Tab Switcher */}
+      <div className="flex bg-slate-100 rounded-2xl p-1 gap-1 max-w-sm">
+        <button
+          type="button"
+          onClick={() => setActiveTab('active')}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'active' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Active ({activeDealers.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('pending')}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all relative ${
+            activeTab === 'pending' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Pending ({pendingDealers.length})
+          {pendingDealers.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 rounded-full text-[9px] font-black text-white flex items-center justify-center border border-white animate-bounce">
+              {pendingDealers.length}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Filter and Search */}
       <div className="flex flex-col md:flex-row gap-3 p-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="relative flex-1">
@@ -231,6 +306,23 @@ const AdminDealers: React.FC = () => {
           <Loader2 className="animate-spin text-teal-600" size={32} />
           <p className="text-xs text-slate-400 font-bold">Loading active nodes...</p>
         </div>
+      ) : errorMsg ? (
+        <div className="bg-rose-50/50 rounded-2xl border border-rose-100 p-16 text-center shadow-sm max-w-md mx-auto space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-150 flex items-center justify-center mx-auto text-rose-500">
+            <ShieldCheck size={24} className="text-rose-500" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-rose-800 uppercase tracking-wider">Access Disallowed</h3>
+            <p className="text-xs text-rose-500 font-bold leading-relaxed mt-1.5">{errorMsg}</p>
+          </div>
+          <button
+            type="button"
+            onClick={fetchDealers}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm mx-auto block"
+          >
+            Retry Connection
+          </button>
+        </div>
       ) : (
         <motion.div 
           variants={containerVariants} 
@@ -247,15 +339,21 @@ const AdminDealers: React.FC = () => {
                 className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4 hover:shadow-md transition-shadow relative overflow-hidden group"
               >
                 {/* Health indicator bar */}
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-emerald-500" />
+                <div className={`absolute top-0 left-0 right-0 h-1.5 ${(dealer.isApproved === false || (dealer as any).approved === false) ? 'bg-amber-500' : 'bg-emerald-500'}`} />
 
                 <div className="flex justify-between items-start pt-1">
                   <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500">
                     <Building2 size={20} />
                   </div>
-                  <span className="px-2.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
-                    Active Node
-                  </span>
+                  {(dealer.isApproved === false || (dealer as any).approved === false) ? (
+                    <span className="px-2.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-100 animate-pulse">
+                      Pending Approval
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
+                      Active Node
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -286,16 +384,36 @@ const AdminDealers: React.FC = () => {
                 </div>
 
                 <div className="flex gap-2 pt-1">
-                  <div className="flex-1 py-2 rounded-xl text-center text-xs font-black uppercase tracking-wider text-teal-600 border border-teal-100 bg-teal-50 flex items-center justify-center gap-1.5">
-                    <ShieldCheck size={14} /> Telemetry Verified
-                  </div>
-                  <button 
-                    onClick={() => handleDeleteDealer(dealer.id, dealer.name)}
-                    className="p-2.5 rounded-xl border border-rose-100 text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all flex items-center justify-center" 
-                    title="De-register Node License"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {activeTab === 'active' ? (
+                    <>
+                      <div className="flex-1 py-2 rounded-xl text-center text-xs font-black uppercase tracking-wider text-teal-600 border border-teal-100 bg-teal-50 flex items-center justify-center gap-1.5">
+                        <ShieldCheck size={14} /> Telemetry Verified
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteDealer(dealer.id, dealer.name)}
+                        className="p-2.5 rounded-xl border border-rose-100 text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all flex items-center justify-center" 
+                        title="De-register Node License"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleApproveDealer(dealer.id, dealer.name)}
+                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-emerald-100/50 hover:shadow-lg transition-all"
+                      >
+                        <Check size={14} /> Approve Node
+                      </button>
+                      <button
+                        onClick={() => handleRejectDealer(dealer.id, dealer.name)}
+                        className="p-2.5 rounded-xl border border-rose-100 text-rose-500 hover:text-rose-600 hover:bg-rose-50 transition-all flex items-center justify-center"
+                        title="Reject & Delete Request"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </motion.div>
             );

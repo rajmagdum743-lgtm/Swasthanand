@@ -4,6 +4,51 @@ import { API_BASE_URL } from '../config/api';
 const SESSION_KEY = 'swasthanand_auth_v1';
 const SESSION_DURATION = 60 * 60 * 1000; // 1 Hour
 
+// ─── Global Fetch Interceptor for JWT ─────────────────────────────────────────
+const originalFetch = window.fetch;
+window.fetch = async (input, init) => {
+  let token: string | null = null;
+  try {
+    const saved = localStorage.getItem(SESSION_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (new Date().getTime() < parsed.expiry) {
+        token = parsed.token;
+      }
+    }
+  } catch (e) {}
+
+  if (token) {
+    init = init || {};
+    const headers = new Headers(init.headers || {});
+    if (!headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    init.headers = headers;
+  }
+
+  try {
+    const response = await originalFetch(input, init);
+    if ((response.status === 401 || response.status === 403) && token && token.startsWith('mock-')) {
+      localStorage.removeItem(SESSION_KEY);
+      window.location.href = '/';
+    }
+    return response;
+  } catch (err) {
+    if (token && token.startsWith('mock-')) {
+      try {
+        const ping = await originalFetch(`${API_BASE_URL}/api/auth/check-phone/9999999999`);
+        if (ping.ok) {
+          localStorage.removeItem(SESSION_KEY);
+          window.location.href = '/';
+        }
+      } catch (pingErr) {}
+    }
+    throw err;
+  }
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ─── Timeout-aware fetch (default 12 seconds) ────────────────────────────────
 const fetchWithTimeout = (url: string, options: RequestInit = {}, timeoutMs = 12000): Promise<Response> => {
   const controller = new AbortController();
@@ -42,14 +87,15 @@ interface RegisterData {
   district: string;
   village: string;
   landMark: string;
+  role?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   checkPhone: (phone: string) => Promise<boolean>;
   sendOtp: (phone: string) => Promise<{ success: boolean; isRegistered: boolean; error?: string }>;
-  verifyOtp: (phone: string, otp: string, registrationData?: RegisterData) => Promise<{ success: boolean; isRegistered: boolean; user?: User }>;
-  register: (data: RegisterData) => Promise<boolean>;
+  verifyOtp: (phone: string, otp: string, registrationData?: RegisterData) => Promise<{ success: boolean; isRegistered: boolean; user?: User; error?: string }>;
+  register: (data: RegisterData) => Promise<{ success: boolean; isPendingApproval?: boolean }>;
   login: (phone: string, password: string) => Promise<User | null>;
   updateProfile: (userData: User) => Promise<boolean>;
   logout: () => void;
@@ -73,10 +119,10 @@ const MOCK_USERS: Record<string, User> = {
       isDefault: true
     }]
   },
-  '92849939947': {
+  '9284993994': {
     id: 'admin-2',
     name: 'Swasthanand Admin',
-    phone: '92849939947',
+    phone: '9284993994',
     role: 'ADMIN',
     addresses: []
   }
@@ -89,7 +135,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!saved) return null;
 
     try {
-      const { user: savedUser, expiry } = JSON.parse(saved);
+      const { user: savedUser, token, expiry } = JSON.parse(saved);
+      if (token && token.startsWith('mock-')) {
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
       if (new Date().getTime() < expiry) {
         return savedUser;
       }
@@ -101,7 +151,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
 
   const checkPhone = async (phone: string) => {
-    if (['92849939947', '9284939947', '9999999999'].includes(phone)) {
+    if (['9284993994', '9284939947', '9999999999'].includes(phone)) {
       return true;
     }
     try {
@@ -115,11 +165,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const saveUserSession = (userData: User | null) => {
+  const saveUserSession = (userData: User | null, token: string | null = null) => {
     setUser(userData);
     if (userData) {
       const expiry = new Date().getTime() + SESSION_DURATION;
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ user: userData, expiry }));
+      let finalToken = token;
+      if (!finalToken) {
+        try {
+          const saved = localStorage.getItem(SESSION_KEY);
+          if (saved) {
+            finalToken = JSON.parse(saved).token;
+          }
+        } catch (e) {}
+      }
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ user: userData, token: finalToken, expiry }));
     } else {
       localStorage.removeItem(SESSION_KEY);
     }
@@ -148,17 +207,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const verifyOtp = async (phone: string, otp: string) => {
-    if (otp === '123456' && phone === '9284939947') {
-      const u: User = {
-        id: 'dealer-id',
-        name: 'Swasthanand Dealer',
-        phone: phone,
-        role: 'DEALER',
-        addresses: []
-      };
-      saveUserSession(u);
-      return { success: true, isRegistered: true, user: u };
-    }
     try {
       const response = await fetchWithTimeout(
         `${API_BASE_URL}/api/auth/verify-otp`,
@@ -166,23 +214,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone, otp })
-        }
+        },
+        15000
       );
 
-      const data = await response.json();
-
-      if (data.success) {
-        if (data.isRegistered) {
-          saveUserSession(data.user);
-          return { success: true, isRegistered: true, user: data.user };
-        } else {
-          return { success: true, isRegistered: false };
-        }
-      } else {
-        return { success: false, isRegistered: false };
+      const resData = await response.json();
+      if (response.status === 403) {
+        return { success: false, isRegistered: false, error: resData.message || "Pending administrator approval." };
       }
+      if (resData.success) {
+        if (resData.isRegistered) {
+          saveUserSession(resData.user, resData.token);
+        }
+        return { success: true, isRegistered: resData.isRegistered, user: resData.user };
+      }
+      return { success: false, isRegistered: false };
     } catch (err: any) {
       console.error('Verify OTP error:', err);
+      const isConnectionError = err?.name === 'AbortError' || err instanceof TypeError || (err?.message && (err.message.toLowerCase().includes('connect') || err.message.toLowerCase().includes('network')));
+      if (isConnectionError && otp === '123456' && phone === '9284939947') {
+        const u: User = {
+          id: 'dealer-id',
+          name: 'Swasthanand Dealer',
+          phone: phone,
+          role: 'DEALER',
+          addresses: []
+        };
+        saveUserSession(u, 'mock-dealer-token');
+        return { success: true, isRegistered: true, user: u };
+      }
       return { success: false, isRegistered: false };
     }
   };
@@ -201,10 +261,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const resData = await response.json();
       if (resData.success) {
-        saveUserSession(resData.user);
-        return true;
+        if (resData.isPendingApproval) {
+          return { success: true, isPendingApproval: true };
+        }
+        saveUserSession(resData.user, resData.token);
+        return { success: true, isPendingApproval: false };
       }
-      return false;
+      return { success: false };
     } catch (err: any) {
       console.error('Registration failed:', err);
       // Alert user about connection issues if on APK
@@ -213,35 +276,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         alert("Cannot connect to server at " + API_BASE_URL + ". Registration failed.");
       }
-      return false;
+      return { success: false };
     }
   };
 
   const login = async (phone: string, password: string): Promise<User | null> => {
-    if (password === 'admin123') {
-      if (phone === '92849939947' || phone === '9999999999') {
-        const u: User = {
-          id: 'admin-id',
-          name: 'Swasthanand Admin',
-          phone: phone,
-          role: 'ADMIN',
-          addresses: []
-        };
-        saveUserSession(u);
-        return u;
-      }
-      if (phone === '9284939947') {
-        const u: User = {
-          id: 'dealer-id',
-          name: 'Swasthanand Dealer',
-          phone: phone,
-          role: 'DEALER',
-          addresses: []
-        };
-        saveUserSession(u);
-        return u;
-      }
-    }
     try {
       const response = await fetchWithTimeout(
         `${API_BASE_URL}/api/auth/login`,
@@ -255,40 +294,53 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const data = await response.json();
       if (response.ok && data.success) {
-        saveUserSession(data.user);
+        saveUserSession(data.user, data.token);
         return data.user;
       }
-      if (password === 'admin123') {
-        if (phone === '92849939947' || phone === '9999999999') {
-          const u: User = { id: 'admin-id', name: 'Swasthanand Admin', phone, role: 'ADMIN', addresses: [] };
-          saveUserSession(u);
-          return u;
-        }
-        if (phone === '9284939947') {
-          const u: User = { id: 'dealer-id', name: 'Swasthanand Dealer', phone, role: 'DEALER', addresses: [] };
-          saveUserSession(u);
-          return u;
-        }
+      if (response.status === 403) {
+        throw new Error(data.message || "Your registration request is pending administrator approval.");
       }
       return null;
     } catch (err: any) {
       console.error('Login failed:', err);
-      if (password === 'admin123') {
-        if (phone === '92849939947' || phone === '9999999999') {
-          const u: User = { id: 'admin-id', name: 'Swasthanand Admin', phone, role: 'ADMIN', addresses: [] };
-          saveUserSession(u);
+      if (err.message && err.message.includes("pending administrator approval")) {
+        throw err;
+      }
+
+      // Check if it's a network/connection error
+      const isConnectionError = err.name === 'AbortError' || err instanceof TypeError || (err.message && (err.message.toLowerCase().includes('connect') || err.message.toLowerCase().includes('network')));
+
+      if (isConnectionError && password === 'admin123') {
+        if (phone === '92849939947' || phone === '9999999999' || phone === '9284993994') {
+          const u: User = {
+            id: 'admin-id',
+            name: 'Swasthanand Admin',
+            phone: phone,
+            role: 'ADMIN',
+            addresses: []
+          };
+          saveUserSession(u, 'mock-admin-token');
           return u;
         }
         if (phone === '9284939947') {
-          const u: User = { id: 'dealer-id', name: 'Swasthanand Dealer', phone, role: 'DEALER', addresses: [] };
-          saveUserSession(u);
+          const u: User = {
+            id: 'dealer-id',
+            name: 'Swasthanand Dealer',
+            phone: phone,
+            role: 'DEALER',
+            addresses: []
+          };
+          saveUserSession(u, 'mock-dealer-token');
           return u;
         }
       }
+
       if (err?.name === 'AbortError') {
         alert("Login timed out. Check your WiFi connection to your PC.");
+      } else if (!isConnectionError) {
+        alert("Login failed: " + (err.message || "Invalid phone or password"));
       } else {
-        alert("Login failed: " + (err.message || "Network Error"));
+        alert("Cannot connect to server. Please make sure the backend is running.");
       }
       return null;
     }

@@ -44,19 +44,28 @@ public class OtpService {
                 code = String.format("%06d", random.nextInt(1000000));
             }
             otpStorage.put(phone, new OtpData(code));
+            System.out.println(">>> Generated OTP for phone '" + phone + "' is: " + code);
             return code;
         });
     }
 
     public Mono<Boolean> verifyOtp(String phone, String code) {
         return Mono.fromCallable(() -> {
+            System.out.println(">>> Verifying OTP for phone '" + phone + "' with code '" + code + "'");
+            System.out.println(">>> Current keys in otpStorage: " + otpStorage.keySet());
             OtpData data = otpStorage.get(phone);
-            if (data == null || data.isExpired()) {
+            if (data == null) {
+                System.out.println(">>> No OTP data found for phone '" + phone + "'");
+                return false;
+            }
+            if (data.isExpired()) {
+                System.out.println(">>> OTP data for phone '" + phone + "' has expired");
                 otpStorage.remove(phone);
                 return false;
             }
 
             boolean isValid = data.code.equals(code);
+            System.out.println(">>> Verification result: " + isValid + " (stored: '" + data.code + "', entered: '" + code + "')");
             if (isValid) {
                 otpStorage.remove(phone); // Clear after successful use
             }

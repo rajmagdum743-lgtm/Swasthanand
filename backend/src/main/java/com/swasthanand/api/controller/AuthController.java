@@ -6,6 +6,7 @@ import com.swasthanand.api.service.OtpService;
 import com.swasthanand.api.service.SmsService;
 import com.swasthanand.api.dto.OtpRequest;
 import com.swasthanand.api.dto.OtpVerifyRequest;
+import com.swasthanand.api.security.JwtUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -22,12 +23,14 @@ public class AuthController {
     private final OtpService otpService;
     private final SmsService smsService;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
-    public AuthController(UserService userService, OtpService otpService, SmsService smsService, PasswordEncoder passwordEncoder) {
+    public AuthController(UserService userService, OtpService otpService, SmsService smsService, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
         this.userService = userService;
         this.otpService = otpService;
         this.smsService = smsService;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/request-otp")
@@ -47,10 +50,14 @@ public class AuthController {
 
                     return userService.findByPhone(request.getPhone())
                             .map(user -> {
+                                if (Boolean.FALSE.equals(user.getIsApproved())) {
+                                    return ResponseEntity.status(403).body((Object) Map.of("success", false, "message", "Your registration request is pending administrator approval."));
+                                }
                                 Map<String, Object> response = new HashMap<>();
                                 response.put("success", true);
                                 response.put("isRegistered", true);
                                 response.put("user", user);
+                                response.put("token", jwtUtil.generateToken(user));
                                 return ResponseEntity.ok((Object) response);
                             })
                             .defaultIfEmpty(ResponseEntity.ok((Object) Map.of("success", true, "isRegistered", false)));
@@ -75,10 +82,14 @@ public class AuthController {
 
         return userService.findByPhone(phone)
                 .map(user -> {
+                    if (Boolean.FALSE.equals(user.getIsApproved())) {
+                        return ResponseEntity.status(403).body((Object) Map.of("success", false, "message", "Your registration request is pending administrator approval."));
+                    }
                     if (passwordEncoder.matches(password, user.getPassword())) {
                         return ResponseEntity.ok((Object) Map.of(
                             "success", true,
-                            "user", user
+                            "user", user,
+                            "token", jwtUtil.generateToken(user)
                         ));
                     } else {
                         return ResponseEntity.status(401).body((Object) Map.of("success", false, "message", "Invalid phone or password"));
@@ -110,12 +121,24 @@ public class AuthController {
             return userService.findByPhone(phone)
                     .flatMap(existingUser -> Mono.just(ResponseEntity.badRequest().body((Object) Map.of("message", "Phone number already registered"))))
                     .switchIfEmpty(Mono.defer(() -> {
+                        User.Role finalRole = User.Role.CUSTOMER;
+                        boolean approved = true;
+                        if (registrationRequest.containsKey("role")) {
+                            try {
+                                finalRole = User.Role.valueOf(((String) registrationRequest.get("role")).toUpperCase());
+                                if (finalRole == User.Role.DEALER) {
+                                    approved = false;
+                                }
+                            } catch (Exception e) {}
+                        }
+
                         User user = User.builder()
                             .phone(phone)
                             .password(passwordEncoder.encode(password))
                             .name(name)
                             .addresses(new ArrayList<>())
-                            .role(User.Role.CUSTOMER)
+                            .role(finalRole)
+                            .isApproved(approved)
                             .build();
                         
                         User.Address firstAddress = User.Address.builder()
@@ -131,10 +154,17 @@ public class AuthController {
                         user.getAddresses().add(firstAddress);
                         
                         return userService.registerUser(user)
-                            .map(registeredUser -> ResponseEntity.ok((Object) Map.of(
-                                "success", true,
-                                "user", registeredUser
-                            )));
+                            .map(registeredUser -> {
+                                Map<String, Object> response = new HashMap<>();
+                                response.put("success", true);
+                                response.put("user", registeredUser);
+                                if (Boolean.FALSE.equals(registeredUser.getIsApproved())) {
+                                    response.put("isPendingApproval", true);
+                                } else {
+                                    response.put("token", jwtUtil.generateToken(registeredUser));
+                                }
+                                return ResponseEntity.ok((Object) response);
+                            });
                     }));
         } catch (Exception e) {
             return Mono.just(ResponseEntity.internalServerError().body((Object) Map.of("message", "Registration failed: " + e.getMessage())));

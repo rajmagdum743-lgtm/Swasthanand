@@ -51,6 +51,7 @@ public class AdminController {
                             .name(name)
                             .password(passwordEncoder.encode(password))
                             .role(User.Role.valueOf(roleStr.toUpperCase()))
+                            .isApproved(true)
                             .addresses(new java.util.ArrayList<>())
                             .build();
 
@@ -121,6 +122,17 @@ public class AdminController {
                 })
                 .defaultIfEmpty(ResponseEntity.<Object>notFound().build())
                 .map(res -> (ResponseEntity<Object>) (ResponseEntity<?>) res);
+    }
+
+    @PutMapping("/users/{id}/approve")
+    public Mono<ResponseEntity<Object>> approveUser(@PathVariable String id) {
+        return userRepository.findById(id)
+                .flatMap(user -> {
+                    user.setIsApproved(true);
+                    return userRepository.save(user)
+                            .map(saved -> ResponseEntity.ok((Object) Map.of("success", true, "message", "User approved successfully.")));
+                })
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/users/{id}")

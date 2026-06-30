@@ -145,3 +145,18 @@ body {
   50% { opacity: 0.4; }
 }
 
+/* Print Overrides to isolate the receipt element */
+@media print {
+  body > *:not(#swasthanand-print-root) {
+    display: none !important;
+  }
+  #swasthanand-print-root {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+}
+

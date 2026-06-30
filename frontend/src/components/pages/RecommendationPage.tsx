@@ -37,6 +37,59 @@ interface RecommendationResponse {
   recommendations: RecommendedProduct[];
 }
 
+const DOSHA_QUESTIONS = [
+  {
+    id: 'bodyFrame',
+    label: 'Body Frame & Weight',
+    description: 'Which option best describes your physical build?',
+    options: [
+      { value: 'vata', label: 'Vata Type (Air)', desc: 'Thin, light-boned, difficult to gain weight.' },
+      { value: 'pitta', label: 'Pitta Type (Fire)', desc: 'Medium build, athletic, stable and balanced weight.' },
+      { value: 'kapha', label: 'Kapha Type (Earth)', desc: 'Broad, heavy-boned, gains weight easily.' }
+    ]
+  },
+  {
+    id: 'skinType',
+    label: 'Skin Quality',
+    description: 'Describe the natural tendency of your skin:',
+    options: [
+      { value: 'vata', label: 'Vata Type (Air)', desc: 'Dry, rough, thin, easily gets chapped.' },
+      { value: 'pitta', label: 'Pitta Type (Fire)', desc: 'Warm, sensitive, reddish, prone to acne.' },
+      { value: 'kapha', label: 'Kapha Type (Earth)', desc: 'Smooth, soft, oily, thick, pale, cool.' }
+    ]
+  },
+  {
+    id: 'weatherPref',
+    label: 'Weather & Environment Preference',
+    description: 'Which weather condition do you find most uncomfortable?',
+    options: [
+      { value: 'vata', label: 'Vata Type (Air)', desc: 'Cold, dry, and windy climates; I crave heat.' },
+      { value: 'pitta', label: 'Pitta Type (Fire)', desc: 'Hot, humid weather; I crave cool breeze/shades.' },
+      { value: 'kapha', label: 'Kapha Type (Earth)', desc: 'Damp, cold, and cloudy weather; I crave dryness.' }
+    ]
+  },
+  {
+    id: 'mentalState',
+    label: 'Mental & Emotional Tendencies',
+    description: 'How do you usually react under stress or pressure?',
+    options: [
+      { value: 'vata', label: 'Vata Type (Air)', desc: 'I get anxious, worried, and my mind races with thoughts.' },
+      { value: 'pitta', label: 'Pitta Type (Fire)', desc: 'I get impatient, frustrated, and quick to express anger.' },
+      { value: 'kapha', label: 'Kapha Type (Earth)', desc: 'I remain calm, steady, and sometimes seek comfort in sleep.' }
+    ]
+  },
+  {
+    id: 'digestionType',
+    label: 'Appetite & Digestion',
+    description: 'What describes your typical daily digestion pattern?',
+    options: [
+      { value: 'vata', label: 'Vata Type (Air)', desc: 'Irregular. Sometimes hungry, sometimes forgetting to eat; prone to gas.' },
+      { value: 'pitta', label: 'Pitta Type (Fire)', desc: 'Intense and regular. I get irritable if a meal is delayed; prone to acidity.' },
+      { value: 'kapha', label: 'Kapha Type (Earth)', desc: 'Slow but steady. I digest slowly and often feel heavy after meals.' }
+    ]
+  }
+];
+
 const RecommendationPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -48,7 +101,12 @@ const RecommendationPage: React.FC = () => {
     goal: 'weight-loss',
     diseases: [] as string[],
     allergies: [] as string[],
-    activityLevel: 'moderate'
+    activityLevel: 'moderate',
+    bodyFrame: 'vata',
+    skinType: 'vata',
+    weatherPref: 'vata',
+    mentalState: 'vata',
+    digestionType: 'vata'
   });
 
   const GOALS = [
@@ -90,12 +148,55 @@ const RecommendationPage: React.FC = () => {
     }));
   };
 
+  const calculateDoshas = () => {
+    const answers = [
+      formData.bodyFrame,
+      formData.skinType,
+      formData.weatherPref,
+      formData.mentalState,
+      formData.digestionType
+    ];
+    const vata = answers.filter(a => a === 'vata').length;
+    const pitta = answers.filter(a => a === 'pitta').length;
+    const kapha = answers.filter(a => a === 'kapha').length;
+
+    return {
+      vata: Math.round((vata / 5) * 100),
+      pitta: Math.round((pitta / 5) * 100),
+      kapha: Math.round((kapha / 5) * 100)
+    };
+  };
+
+  const getDominantDoshaDesc = () => {
+    const doshaValues = calculateDoshas();
+    const dominant = Object.entries(doshaValues).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+    
+    switch (dominant) {
+      case 'vata':
+        return 'Dominant: Vata (Air & Space). You tend to be creative, active, and light on your feet, but are prone to anxiety, cold sensitivity, and dry skin when out of balance.';
+      case 'pitta':
+        return 'Dominant: Pitta (Fire & Water). You are highly focused, sharp, and ambitious, but have a tendency toward inflammation, anger, and heat sensitivity when out of balance.';
+      case 'kapha':
+        return 'Dominant: Kapha (Earth & Water). You possess a calm, loving, and steady nature with great stamina, but can experience slow digestion and lethargy when out of balance.';
+      default:
+        return 'Your doshas are in unique balance. We recommend focusing on seasonal changes.';
+    }
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/recommend`, formData);
+      const response = await axios.post(`${API_BASE_URL}/api/recommend`, {
+        age: formData.age,
+        weight: formData.weight,
+        height: formData.height,
+        goal: formData.goal,
+        diseases: formData.diseases,
+        allergies: formData.allergies,
+        activityLevel: formData.activityLevel
+      });
       setResults(response.data);
-      setStep(4);
+      setStep(5);
     } catch (error) {
       console.error('Error fetching recommendations:', error);
       alert('Failed to get recommendations. Please ensure the backend is running.');
@@ -106,6 +207,8 @@ const RecommendationPage: React.FC = () => {
 
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
+
+  const doshaPercentages = calculateDoshas();
 
   return (
     <div className="pt-32 pb-40 px-6 min-h-screen bg-slate-50 selection:bg-emerald-100 selection:text-emerald-900">
@@ -195,34 +298,43 @@ const RecommendationPage: React.FC = () => {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="space-y-10"
+                className="space-y-8"
               >
-                <div className="flex items-center gap-4 mb-8">
+                <div className="flex items-center gap-4 mb-4">
                   <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-                    <Target size={24} />
+                    <Activity size={24} />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Your Health Goal</h2>
-                    <p className="text-slate-500 font-medium">What is your primary focus for this transition?</p>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Prakriti (Dosha) Quiz</h2>
+                    <p className="text-slate-500 font-medium">Select traits that represent your natural defaults.</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {GOALS.map((goal) => (
-                    <button
-                      key={goal.id}
-                      onClick={() => handleInputChange('goal', goal.id)}
-                      className={`p-6 rounded-3xl border transition-all flex flex-col items-center gap-4 group ${formData.goal === goal.id
-                          ? 'bg-emerald-500 border-emerald-600 text-white shadow-xl shadow-emerald-200 scale-[1.02]'
-                          : 'bg-white border-slate-100 hover:border-emerald-200 text-slate-600'
-                        }`}
-                    >
-                      <div className={`p-4 rounded-2xl transition-colors ${formData.goal === goal.id ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-500'
-                        }`}>
-                        <goal.icon size={28} />
+                <div className="space-y-6">
+                  {DOSHA_QUESTIONS.map((q) => (
+                    <div key={q.id} className="space-y-3">
+                      <label className="text-sm font-black text-slate-400 uppercase tracking-widest px-2">{q.label}</label>
+                      <p className="text-xs text-slate-400 italic px-2">{q.description}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {q.options.map((opt) => {
+                          const isSelected = (formData as any)[q.id] === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => handleInputChange(q.id, opt.value)}
+                              className={`p-4 rounded-2xl border text-left transition-all ${isSelected
+                                ? 'bg-emerald-500 border-emerald-600 text-white shadow-lg scale-[1.01]'
+                                : 'bg-white border-slate-100 hover:border-emerald-200 text-slate-600'
+                              }`}
+                            >
+                              <div className="font-bold text-sm mb-1">{opt.label}</div>
+                              <div className={`text-xs ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>{opt.desc}</div>
+                            </button>
+                          );
+                        })}
                       </div>
-                      <span className="font-bold text-sm tracking-tight">{goal.label}</span>
-                    </button>
+                    </div>
                   ))}
                 </div>
 
@@ -249,6 +361,56 @@ const RecommendationPage: React.FC = () => {
               >
                 <div className="flex items-center gap-4 mb-8">
                   <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                    <Target size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Your Health Goal</h2>
+                    <p className="text-slate-500 font-medium">What is your primary focus for this transition?</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {GOALS.map((goal) => (
+                    <button
+                      key={goal.id}
+                      onClick={() => handleInputChange('goal', goal.id)}
+                      className={`p-6 rounded-3xl border transition-all flex flex-col items-center gap-4 group ${formData.goal === goal.id
+                        ? 'bg-emerald-500 border-emerald-600 text-white shadow-xl shadow-emerald-200 scale-[1.02]'
+                        : 'bg-white border-slate-100 hover:border-emerald-200 text-slate-600'
+                      }`}
+                    >
+                      <div className={`p-4 rounded-2xl transition-colors ${formData.goal === goal.id ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-500'
+                      }`}>
+                        <goal.icon size={28} />
+                      </div>
+                      <span className="font-bold text-sm tracking-tight">{goal.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex justify-between pt-6">
+                  <button onClick={prevStep} className="flex items-center gap-2 px-8 py-4 font-bold text-slate-500 hover:text-emerald-500 transition-colors">
+                    <ChevronLeft size={20} />
+                    <span>Back</span>
+                  </button>
+                  <button onClick={nextStep} className="btn-premium px-10 py-4 group">
+                    <span>Next Phase</span>
+                    <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 4 && (
+              <motion.div
+                key="step4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-10"
+              >
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
                     <Stethoscope size={24} />
                   </div>
                   <div>
@@ -263,9 +425,9 @@ const RecommendationPage: React.FC = () => {
                       key={disease}
                       onClick={() => toggleDisease(disease.toLowerCase())}
                       className={`px-6 py-3 rounded-full font-bold text-sm transition-all border ${formData.diseases.includes(disease.toLowerCase())
-                          ? 'bg-emerald-500 border-emerald-600 text-white shadow-lg'
-                          : 'bg-white border-slate-100 text-slate-500 hover:border-emerald-300'
-                        }`}
+                        ? 'bg-emerald-500 border-emerald-600 text-white shadow-lg'
+                        : 'bg-white border-slate-100 text-slate-500 hover:border-emerald-300'
+                      }`}
                     >
                       {disease}
                     </button>
@@ -280,9 +442,9 @@ const RecommendationPage: React.FC = () => {
                         key={allergy}
                         onClick={() => toggleAllergy(allergy.toLowerCase())}
                         className={`px-6 py-2 rounded-full font-bold text-xs transition-all border ${formData.allergies.includes(allergy.toLowerCase())
-                            ? 'bg-rose-500 border-rose-600 text-white shadow-lg'
-                            : 'bg-white border-slate-100 text-slate-400 hover:border-rose-200 hover:text-rose-500'
-                          }`}
+                          ? 'bg-rose-500 border-rose-600 text-white shadow-lg'
+                          : 'bg-white border-slate-100 text-slate-400 hover:border-rose-200 hover:text-rose-500'
+                        }`}
                       >
                         {allergy}
                       </button>
@@ -298,9 +460,9 @@ const RecommendationPage: React.FC = () => {
                         key={level}
                         onClick={() => handleInputChange('activityLevel', level)}
                         className={`p-4 rounded-2xl font-bold text-sm capitalize transition-all border ${formData.activityLevel === level
-                            ? 'bg-slate-800 border-slate-900 text-white shadow-lg'
-                            : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'
-                          }`}
+                          ? 'bg-slate-800 border-slate-900 text-white shadow-lg'
+                          : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'
+                        }`}
                       >
                         {level}
                       </button>
@@ -329,9 +491,9 @@ const RecommendationPage: React.FC = () => {
               </motion.div>
             )}
 
-            {step === 4 && results && (
+            {step === 5 && results && (
               <motion.div
-                key="step4"
+                key="step5"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="space-y-12"
@@ -362,6 +524,64 @@ const RecommendationPage: React.FC = () => {
                       <p className="text-lg font-medium leading-relaxed italic pr-12">
                         "{results.profileSummary.ayurvedicInsight}"
                       </p>
+                    </div>
+                  </div>
+
+                  {/* Dosha Progress Bar Report */}
+                  <div className="bg-white border border-slate-100 p-8 rounded-[2rem] shadow-lg space-y-6">
+                    <div>
+                      <h3 className="text-xl font-black text-slate-800 tracking-tight">Your Dosha Constitution (Prakriti)</h3>
+                      <p className="text-slate-500 font-medium text-sm mt-1">{getDominantDoshaDesc()}</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Vata Bar */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm font-bold text-slate-700">
+                          <span>Vata (Air & Space)</span>
+                          <span>{doshaPercentages.vata}%</span>
+                        </div>
+                        <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${doshaPercentages.vata}%` }}
+                            transition={{ duration: 0.8, ease: 'easeOut' }}
+                            className="h-full bg-gradient-to-r from-sky-400 to-teal-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Pitta Bar */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm font-bold text-slate-700">
+                          <span>Pitta (Fire & Water)</span>
+                          <span>{doshaPercentages.pitta}%</span>
+                        </div>
+                        <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${doshaPercentages.pitta}%` }}
+                            transition={{ duration: 0.8, ease: 'easeOut' }}
+                            className="h-full bg-gradient-to-r from-amber-500 to-rose-600"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Kapha Bar */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm font-bold text-slate-700">
+                          <span>Kapha (Earth & Water)</span>
+                          <span>{doshaPercentages.kapha}%</span>
+                        </div>
+                        <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${doshaPercentages.kapha}%` }}
+                            transition={{ duration: 0.8, ease: 'easeOut' }}
+                            className="h-full bg-gradient-to-r from-emerald-600 to-stone-700"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

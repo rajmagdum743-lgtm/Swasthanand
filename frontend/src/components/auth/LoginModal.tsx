@@ -33,7 +33,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, initialMode = 
     village: '',
     landMark: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'CUSTOMER'
   });
   const [states, setStates] = useState<string[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
@@ -163,28 +164,33 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, initialMode = 
     }
     setIsLoading(true);
     setError('');
-    const loggedInUser = await login(phone, password);
-    setIsLoading(false);
-    if (loggedInUser) {
-      // Validate role according to selected tab mode
-      if (mode === 'admin' && loggedInUser.role !== 'ADMIN') {
-        setError('This account does not have Admin privileges.');
-        logout();
-        return;
+    try {
+      const loggedInUser = await login(phone, password);
+      setIsLoading(false);
+      if (loggedInUser) {
+        // Validate role according to selected tab mode
+        if (mode === 'admin' && loggedInUser.role !== 'ADMIN') {
+          setError('This account does not have Admin privileges.');
+          logout();
+          return;
+        }
+        if (mode === 'dealer' && loggedInUser.role !== 'DEALER') {
+          setError('This account does not have Dealer privileges.');
+          logout();
+          return;
+        }
+        if (mode === 'login' && loggedInUser.role !== 'CUSTOMER') {
+          setError('Please use the Admin or Dealer tab to log in to Console panels.');
+          logout();
+          return;
+        }
+        onClose();
+      } else {
+        setError('Invalid phone or password. Please try again.');
       }
-      if (mode === 'dealer' && loggedInUser.role !== 'DEALER') {
-        setError('This account does not have Dealer privileges.');
-        logout();
-        return;
-      }
-      if (mode === 'login' && loggedInUser.role !== 'CUSTOMER') {
-        setError('Please use the Admin or Dealer tab to log in to Console panels.');
-        logout();
-        return;
-      }
-      onClose();
-    } else {
-      setError('Invalid phone or password. Please try again.');
+    } catch (err: any) {
+      setIsLoading(false);
+      setError(err.message || 'Login failed. Please try again.');
     }
   };
 
@@ -258,9 +264,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, initialMode = 
     }
     setIsLoading(true);
     setError('');
-    const success = await register({ ...registrationData, phone });
+    const res = await register({ ...registrationData, phone });
     setIsLoading(false);
-    if (success) {
+    if (res.success) {
+      if (res.isPendingApproval) {
+        alert("Registration request submitted! Your account is pending administrator approval before you can log in.");
+      }
       onClose();
     } else {
       setError('Registration failed. Please try again.');
@@ -439,6 +448,34 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, initialMode = 
 
                 {step === 3 && (
                   <motion.div key="register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3.5">
+                    <div className="space-y-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-100/50 flex items-center justify-between">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Registering As</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRegistrationChange('role', 'CUSTOMER')}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                            registrationData.role !== 'DEALER'
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'bg-white text-slate-400 border border-slate-200'
+                          }`}
+                        >
+                          Customer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRegistrationChange('role', 'DEALER')}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                            registrationData.role === 'DEALER'
+                              ? 'bg-amber-500 text-white shadow-sm'
+                              : 'bg-white text-slate-400 border border-slate-200'
+                          }`}
+                        >
+                          Dealer
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="space-y-1">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Password *</label>
                       <input type="password" placeholder="Create a password" value={registrationData.password} onChange={e => handleRegistrationChange('password', e.target.value)}

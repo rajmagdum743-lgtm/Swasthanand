@@ -41,11 +41,12 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private Mono<Void> initializeAdmin() {
-        String adminPhone = "92849939947";
+        String adminPhone = "9999999999";
         return userService.findByPhone(adminPhone)
             .flatMap(existingAdmin -> {
                 existingAdmin.setPassword(passwordEncoder.encode("admin123"));
                 existingAdmin.setRole(User.Role.ADMIN);
+                existingAdmin.setIsApproved(true);
                 return userService.updateUser(existingAdmin);
             })
             .switchIfEmpty(Mono.defer(() -> {
@@ -54,6 +55,7 @@ public class DataInitializer implements CommandLineRunner {
                         .password(passwordEncoder.encode("admin123"))
                         .name("Swasthanand Admin")
                         .role(User.Role.ADMIN)
+                        .isApproved(true)
                         .addresses(new ArrayList<>())
                         .build();
                 return userService.registerUser(admin);
@@ -67,6 +69,7 @@ public class DataInitializer implements CommandLineRunner {
             .flatMap(existingDealer -> {
                 existingDealer.setPassword(passwordEncoder.encode("admin123"));
                 existingDealer.setRole(User.Role.DEALER);
+                existingDealer.setIsApproved(true);
                 return userService.updateUser(existingDealer);
             })
             .switchIfEmpty(Mono.defer(() -> {
@@ -75,6 +78,7 @@ public class DataInitializer implements CommandLineRunner {
                         .password(passwordEncoder.encode("admin123"))
                         .name("Swasthanand Dealer")
                         .role(User.Role.DEALER)
+                        .isApproved(true)
                         .addresses(new ArrayList<>())
                         .build();
                 return userService.registerUser(dealer);

@@ -9,6 +9,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Persistable;
 import org.springframework.data.annotation.Transient;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Table("users")
 @Getter
@@ -25,6 +26,9 @@ public class User implements Persistable<String> {
     private String password;
     private String name;
     private Role role;
+    
+    @JsonProperty("isApproved")
+    private Boolean isApproved;
     
     private String addressesJson; // DB column containing serialized addresses list
 

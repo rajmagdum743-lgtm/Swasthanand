@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
-import { X, User as UserIcon, MapPin, Plus, Check, Trash2, Save, Loader2, Edit3, Clock } from 'lucide-react';
+import { X, User as UserIcon, MapPin, Plus, Check, Trash2, Save, Loader2, Edit3, Clock, Printer, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../context/CartContext';
@@ -13,7 +13,7 @@ interface ProfileModalProps {
   initialTab?: 'info' | 'addresses' | 'cart' | 'orders';
 }
 
-const OrderCard = ({ order }: { order: any }) => (
+const OrderCard = ({ order, onViewInvoice }: { order: any; onViewInvoice: (order: any) => void }) => (
   <div className="bg-white border border-slate-100 rounded-[32px] overflow-hidden shadow-sm hover:shadow-md transition-all group">
     <div className="p-6 flex items-center justify-between border-b border-slate-50">
       <div className="flex items-center gap-4">
@@ -30,19 +30,28 @@ const OrderCard = ({ order }: { order: any }) => (
         <p className="font-black text-emerald-600 text-lg">₹{order.totalAmount}</p>
       </div>
     </div>
-    <div className="p-6 bg-slate-50/50 flex items-center justify-between">
+    <div className="p-6 bg-slate-50/50 flex items-center justify-between flex-wrap gap-4">
       <div className="flex items-center gap-2">
         <Clock size={16} className="text-slate-400" />
         <span className="text-sm font-bold text-slate-500">{new Date(order.createdAt).toLocaleDateString()}</span>
       </div>
-      <div className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${order.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700' :
-        order.status === 'CANCELLED' ? 'bg-red-100 text-red-600' :
-          order.status === 'PENDING' ? 'bg-orange-100 text-orange-600' :
-            order.status === 'CONFIRMED' ? 'bg-indigo-100 text-indigo-600' :
-              order.status === 'TRANSIT' ? 'bg-blue-100 text-blue-600' :
-                'bg-slate-100 text-slate-600'
-        }`}>
-        {order.status}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onViewInvoice(order)}
+          className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 px-3 py-1.5 rounded-xl transition-all border border-emerald-100"
+        >
+          View Receipt
+        </button>
+        <div className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${order.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700' :
+          order.status === 'CANCELLED' ? 'bg-red-100 text-red-600' :
+            order.status === 'PENDING' ? 'bg-orange-100 text-orange-600' :
+              order.status === 'CONFIRMED' ? 'bg-indigo-100 text-indigo-600' :
+                order.status === 'TRANSIT' ? 'bg-blue-100 text-blue-600' :
+                  'bg-slate-100 text-slate-600'
+          }`}>
+          {order.status}
+        </div>
       </div>
     </div>
     {order.status === 'CANCELLED' && order.cancellationReason && (
@@ -117,6 +126,137 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialTab
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any | null>(null);
+
+  const downloadHtmlReceipt = () => {
+    if (!selectedInvoiceOrder) return;
+    const order = selectedInvoiceOrder;
+    const dateStr = new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const isCod = order.razorpayOrderId && order.razorpayOrderId.startsWith('COD_');
+    const paymentMethodText = isCod ? 'Cash on Delivery (COD)' : 'Online Card/UPI';
+    
+    const refHtml = order.razorpayOrderId ? `
+        <div class="meta-row">
+          <span>Transaction Ref:</span>
+          <strong style="color: #334155; font-family: monospace;">${order.razorpayOrderId}</strong>
+        </div>` : '';
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Receipt - INV-SW-${order.id.substring(0, 8).toUpperCase()}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; padding: 40px; color: #1e293b; }
+    .receipt { max-width: 500px; margin: 0 auto; background: white; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+    .header { background: #0f172a; color: white; padding: 32px; display: flex; justify-content: space-between; align-items: center; }
+    .header-logo { font-size: 20px; font-weight: 900; }
+    .header-id { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .body { padding: 32px; }
+    .row { display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 13px; }
+    .label { font-weight: 800; text-transform: uppercase; color: #94a3b8; font-size: 10px; margin-bottom: 4px; }
+    .val { font-weight: 800; color: #1e293b; }
+    .items { border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; padding: 24px 0; margin-bottom: 24px; }
+    .item-desc { font-weight: 900; color: #1e293b; }
+    .item-cat { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .summary { font-size: 14px; font-weight: 700; color: #475569; margin-bottom: 24px; }
+    .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .total { font-size: 18px; font-weight: 900; color: #0f172a; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 16px; }
+    .green { color: #10b981; }
+    .meta { background: #f8fafc; padding: 16px; border-radius: 16px; font-size: 12px; color: #64748b; margin-bottom: 24px; }
+    .meta-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .footer { text-align: center; font-size: 10px; color: #94a3b8; line-height: 1.6; }
+    .badge { display: inline-block; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-weight: 900; text-transform: uppercase; font-size: 9px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="receipt">
+    <div class="header">
+      <div>
+        <div class="header-logo">Swasthanand</div>
+        <div class="header-id">INV-SW-${order.id.substring(0, 8).toUpperCase()}</div>
+      </div>
+    </div>
+    <div class="body">
+      <div class="row">
+        <div>
+          <div class="label">Billed To</div>
+          <div class="val">${user?.name}</div>
+          <div style="color: #64748b;">+91 ${user?.phone}</div>
+        </div>
+        <div style="text-align: right;">
+          <div class="label">Date</div>
+          <div class="val">${dateStr}</div>
+          <div style="color: #64748b;">${timeStr}</div>
+        </div>
+      </div>
+      <div class="items">
+        <div class="row" style="margin-bottom: 0;">
+          <div>
+            <div class="item-desc">Swasthanand Organic Farm Batch Allocation</div>
+            <div class="item-cat">Category: Premium Ayurvedic Marketplace</div>
+          </div>
+          <div class="val" style="font-size: 14px;">₹${order.totalAmount}</div>
+        </div>
+      </div>
+      <div class="summary">
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span style="color: #1e293b;">₹${order.totalAmount}</span>
+        </div>
+        <div class="summary-row" style="font-size: 12px;">
+          <span>Estimated Tax (GST 5%)</span>
+          <span style="color: #1e293b;">Included</span>
+        </div>
+        <div class="summary-row">
+          <span>Delivery Charges</span>
+          <span class="green">FREE</span>
+        </div>
+        <div class="summary-row total">
+          <span>Grand Total</span>
+          <span class="green">₹${order.totalAmount}</span>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="meta-row">
+          <span>Payment Method:</span>
+          <strong style="color: #1e293b;">${paymentMethodText}</strong>
+        </div>
+        ${refHtml}
+      </div>
+      <div class="footer">
+        <span class="badge">🛡️ NABL Lab Certified Purity</span>
+        <p>This is an electronically generated delivery note and invoice. Sourced direct from organic certified growers.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `invoice-SW-${order.id.substring(0, 8).toUpperCase()}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    const receiptEl = document.getElementById('swasthanand-receipt-modal-content');
+    if (!receiptEl) return;
+    const printDiv = document.createElement('div');
+    printDiv.id = 'swasthanand-print-root';
+    printDiv.innerHTML = receiptEl.innerHTML;
+    document.body.appendChild(printDiv);
+    window.print();
+    document.body.removeChild(printDiv);
+  };
 
   const fetchOrders = async () => {
     if (!user) return;
@@ -431,7 +571,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialTab
                             ) : (
                               <div className="grid gap-6">
                                 {activeOrders.map((order, idx) => (
-                                  <OrderCard key={idx} order={order} />
+                                  <OrderCard key={idx} order={order} onViewInvoice={(o) => setSelectedInvoiceOrder(o)} />
                                 ))}
                               </div>
                             )}
@@ -453,7 +593,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialTab
                             ) : (
                               <div className="grid gap-4 opacity-75 grayscale-[0.5]">
                                 {historyOrders.map((order, idx) => (
-                                  <OrderCard key={idx} order={order} />
+                                  <OrderCard key={idx} order={order} onViewInvoice={(o) => setSelectedInvoiceOrder(o)} />
                                 ))}
                               </div>
                             )}
@@ -468,6 +608,152 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialTab
           </motion.div>
         </>
       )}
+      <AnimatePresence>
+        {selectedInvoiceOrder && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[400] flex items-center justify-center p-4">
+            <motion.div
+              id="swasthanand-receipt-modal-content"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[36px] w-full max-w-lg overflow-hidden shadow-2xl relative print-receipt-container print:fixed print:inset-0 print:w-full print:max-w-none print:shadow-none"
+            >
+              {/* Receipt Header */}
+              <div className="p-8 bg-slate-900 text-white flex justify-between items-start print:bg-white print:text-black">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center text-white print:border print:border-black">
+                      <span className="font-black text-sm">S</span>
+                    </div>
+                    <span className="text-lg font-black tracking-tight">Swasthanand</span>
+                  </div>
+                  <p className="text-xs text-slate-400 print:text-slate-500 font-bold">INV-SW-{selectedInvoiceOrder.id.substring(0, 8).toUpperCase()}</p>
+                </div>
+                <div className="flex items-center gap-1 print:hidden">
+                  <button
+                    type="button"
+                    onClick={handlePrint}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white"
+                    title="Print Receipt / Save PDF"
+                  >
+                    <Printer size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadHtmlReceipt}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white"
+                    title="Download Receipt File"
+                  >
+                    <Download size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInvoiceOrder(null)}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/60 hover:text-white"
+                    title="Close"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Receipt Body */}
+              <div className="p-8 space-y-6 text-slate-800 print:p-0">
+                <div className="flex justify-between text-xs">
+                  <div>
+                    <p className="font-black uppercase tracking-wider text-slate-400 mb-1">Billed To</p>
+                    <p className="font-extrabold text-sm text-slate-800">{user.name}</p>
+                    <p className="font-bold text-slate-500">+91 {user.phone}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-black uppercase tracking-wider text-slate-400 mb-1">Date</p>
+                    <p className="font-bold text-sm text-slate-800">{new Date(selectedInvoiceOrder.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    <p className="font-bold text-slate-500">{new Date(selectedInvoiceOrder.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                </div>
+
+                {/* Items Table */}
+                <div className="border-t border-b border-slate-100 py-6 space-y-4">
+                  <div className="flex justify-between text-xs font-black text-slate-400 uppercase tracking-widest">
+                    <span>Description</span>
+                    <span>Total Price</span>
+                  </div>
+                  <div className="flex justify-between text-sm items-center">
+                    <div className="flex flex-col">
+                      <span className="font-black text-slate-800">Swasthanand Organic Farm Batch Allocation</span>
+                      <span className="text-xs text-slate-400 font-semibold mt-0.5">Category: Premium Ayurvedic Marketplace</span>
+                    </div>
+                    <span className="font-black text-slate-900">₹{selectedInvoiceOrder.totalAmount}</span>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div className="space-y-2 text-sm font-bold text-slate-600">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span className="text-slate-800">₹{selectedInvoiceOrder.totalAmount}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span>Estimated Tax (GST 5%)</span>
+                    <span className="text-slate-800">Included</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Delivery Charges</span>
+                    <span className="text-emerald-600">FREE</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-black text-slate-900 pt-3 border-t border-slate-100">
+                    <span>Grand Total</span>
+                    <span className="text-emerald-600">₹{selectedInvoiceOrder.totalAmount}</span>
+                  </div>
+                </div>
+
+                {/* Meta details */}
+                <div className="p-4 bg-slate-50 rounded-2xl text-xs space-y-1 font-semibold text-slate-500">
+                  <div className="flex justify-between">
+                    <span>Payment Method:</span>
+                    <span className="font-bold text-slate-800">
+                      {selectedInvoiceOrder.razorpayOrderId && selectedInvoiceOrder.razorpayOrderId.startsWith('COD_') ? 'Cash on Delivery (COD)' : 'Online Card/UPI'}
+                    </span>
+                  </div>
+                  {selectedInvoiceOrder.razorpayOrderId && (
+                    <div className="flex justify-between">
+                      <span>Transaction Ref:</span>
+                      <span className="font-mono font-bold text-slate-700">{selectedInvoiceOrder.razorpayOrderId}</span>
+                    </div>
+                  )}
+                  {selectedInvoiceOrder.dealershipNodeId && (
+                    <div className="flex justify-between">
+                      <span>Distribution Node:</span>
+                      <span className="font-bold text-slate-800">{selectedInvoiceOrder.dealershipNodeId}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Seal / Footer */}
+                <div className="text-center pt-2 space-y-4 print:pt-10">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider border border-emerald-100">
+                    🛡️ NABL Lab Certified Purity
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed max-w-xs mx-auto">
+                    This is an electronically generated delivery note and invoice. Sourced direct from organic certified growers.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Print Button */}
+              <div className="p-6 bg-slate-50 border-t flex justify-end print:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoiceOrder(null)}
+                  className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black uppercase tracking-widest text-xs transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 };
