@@ -9,4 +9,5 @@ public interface ProductRepository extends R2dbcRepository<Product, String> {
     Flux<Product> findByNameContainingIgnoreCase(String name);
     Mono<Product> findByBatchId(String batchId);
     Flux<Product> findByDealershipNodeId(String dealershipNodeId);
+    Flux<Product> findByIsApprovedTrue();
 }

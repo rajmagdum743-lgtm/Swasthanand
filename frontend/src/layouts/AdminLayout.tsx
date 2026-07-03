@@ -14,8 +14,7 @@ import {
   X,
   User as UserIcon,
   Bell,
-  Activity,
-  ShieldAlert
+  Activity
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';

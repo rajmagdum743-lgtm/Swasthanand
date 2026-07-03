@@ -1,31 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { useProducts } from '../../context/ProductContext';
 import { API_BASE_URL } from '../../config/api';
 import {
-  Boxes,
-  TrendingUp,
-  AlertTriangle,
+  Package,
   Clock,
-  ArrowRight,
-  ShieldCheck,
   CheckCircle2,
   Warehouse,
   Truck,
-  Activity,
-  Loader2
+  Bell,
+  Scan,
+  FileText,
+  X,
+  Play,
+  Plus
 } from 'lucide-react';
-import { motion } from 'framer-motion';
-import type { Variants } from 'framer-motion';
-
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.05 } }
-};
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100, damping: 15 } }
-};
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Order {
   id: string;
@@ -36,15 +26,68 @@ interface Order {
 }
 
 const DealerDashboard: React.FC = () => {
-  const { warehouse } = useOutletContext<{ warehouse: string }>();
+  const { warehouse, nodeId, isDarkMode } = useOutletContext<{ warehouse: string; nodeId: string; isDarkMode: boolean }>();
   const { products, loading: productsLoading } = useProducts() as any;
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanResult, setScanResult] = useState<any | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const startCamera = async () => {
+    try {
+      setIsScanning(true);
+      setScanResult(null);
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+      setStream(mediaStream);
+    } catch (err) {
+      console.warn('Webcam stream not available:', err);
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setIsScanning(false);
+  };
+
+  const openScanner = () => {
+    setScannerOpen(true);
+    setScanResult(null);
+    startCamera();
+  };
+
+  const closeScanner = () => {
+    setScannerOpen(false);
+    stopCamera();
+  };
+
+  useEffect(() => {
+    if (isScanning && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [isScanning, stream]);
+
+  // Clean up camera stream on unmount
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
 
   const fetchOrders = async () => {
     try {
       setOrdersLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/orders`);
+      const res = await fetch(`${API_BASE_URL}/api/orders/node/${nodeId}`);
       if (res.ok) {
         const data = await res.json();
         setOrders(data);
@@ -57,138 +100,232 @@ const DealerDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (nodeId) {
+      fetchOrders();
+    }
+  }, [nodeId]);
 
-  const lowStockProducts = products.filter((p: any) => (p.stock ?? 100) < 15);
+  // Filter products assigned to this dealer's node (allow unassigned defaults)
+  const dealerProducts = products.filter((p: any) => p.dealershipNodeId === nodeId || !p.dealershipNodeId);
+  const lowStockProducts = dealerProducts.filter((p: any) => (p.stock ?? 100) < 15);
   const pendingOrders = orders.filter(o => ['PENDING', 'CONFIRMED', 'TRANSIT', 'SHIPPED'].includes(o.status));
+  const completedOrders = orders.filter(o => o.status === 'DELIVERED');
+
+  // Expiry mock calculation: products with harvest dates older than 6 months or mocked expiry warnings
+  const expiringProducts = dealerProducts.filter((_: any, idx: number) => idx % 4 === 0).map((p: any) => ({
+    ...p,
+    daysLeft: 5 + (p.name.length % 25)
+  }));
 
   const stats = [
-    { title: 'Allocated SKUs', value: String(products.length), change: 'Synchronized with catalog', trend: 'up' },
-    { title: 'Low Stock Items', value: String(lowStockProducts.length), change: lowStockProducts.length > 0 ? 'Requires action' : 'Healthy supply', trend: lowStockProducts.length > 0 ? 'down' : 'stable' },
-    { title: 'Active Dispatches', value: String(pendingOrders.length), change: 'Pending departure', trend: 'up' },
-    { title: 'Node Efficiency', value: '98.6%', change: 'QC Verification optimal', trend: 'stable' }
+    { title: 'My Products', value: `${dealerProducts.length} Items`, desc: 'Active catalog listings', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+    { title: 'My Inventory', value: `${dealerProducts.reduce((acc: number, p: any) => acc + (p.stock ?? 0), 0)} Units`, desc: 'Total items in warehouse', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { title: 'My B2B Orders', value: `${pendingOrders.length} Pending`, desc: 'Incoming purchase requests', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { title: 'Catalog Approvals', value: `${dealerProducts.filter((p: any) => p.status === 'QC_PASSED').length} Approved`, desc: `${dealerProducts.filter((p: any) => p.status === 'DEALER_ALLOCATED').length} pending review`, color: 'text-teal-500', bg: 'bg-teal-500/10' }
   ];
 
-  return (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6 text-white">
+  const quickActions = [
+    { label: 'Verify Stock', icon: Scan, onClick: openScanner, bg: 'from-emerald-500 to-teal-600', text: 'Scan items using camera / SKU' },
+    { label: 'My Catalog', icon: Package, link: '/dealer/inventory', bg: 'from-blue-500 to-indigo-600', text: 'Check stock levels and details' },
+    { label: 'Propose New Product', icon: Plus, link: '/dealer/inventory?propose=true', bg: 'from-amber-500 to-orange-600', text: 'Submit new item for approval' },
+    { label: 'B2B Procurement', icon: Truck, link: '/dealer/orders', bg: 'from-purple-500 to-pink-600', text: 'Accept and process B2B orders' },
+    { label: 'Supply Reports', icon: FileText, link: '/dealer/reports', bg: 'from-slate-600 to-slate-800', text: 'Download supply logs & audits' }
+  ];
 
-      {/* Warehouse Header Telemetry */}
-      <motion.div variants={itemVariants} className="p-6 md:p-8 rounded-3xl border border-white/5 relative overflow-hidden bg-slate-950/40">
+  const recentActivities = [
+    { type: 'order', text: 'New order #ORD-9284 received from Karad Organics', time: '10 mins ago', date: 'Today' },
+    { type: 'stock', text: 'Moringa Powder stock updated: +50 units', time: '1 hour ago', date: 'Today' },
+    { type: 'order', text: 'Order #ORD-7381 marked as Dispatched to Kolhapur Store', time: '3 hours ago', date: 'Today' },
+    { type: 'alert', text: 'Low stock alert: Organic Wild Honey down to 4 units', time: '5 hours ago', date: 'Today' }
+  ];
+
+  // Simulating barcode/QR scanning
+  const triggerMockScan = (product: any) => {
+    setIsScanning(true);
+    setScanResult(null);
+    // Play a mock beep using Web Audio API
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = 1200;
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.08);
+    } catch (e) {
+      console.log('Beep audio error:', e);
+    }
+
+    setTimeout(() => {
+      stopCamera();
+      setScanResult({
+        ...product,
+        mfgDate: product.harvestDate || '2026-03-12',
+        expiryDate: '2026-12-15',
+        qcStatus: 'PASSED',
+        stage: 'Dealer Allocated'
+      });
+    }, 1200);
+  };
+
+  const cardClass = isDarkMode
+    ? 'bg-[#0c1410] border border-white/5 shadow-xl text-white'
+    : 'bg-white border border-slate-100 shadow-sm text-slate-800';
+
+  return (
+    <div className="space-y-8">
+      {/* Welcome Banner */}
+      <div className={`p-6 md:p-8 rounded-3xl relative overflow-hidden ${isDarkMode ? 'bg-[#0b1b12] border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-100'}`}>
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl translate-x-20 -translate-y-20" />
-          <div className="absolute left-1/4 bottom-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-2xl translate-y-16" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl translate-x-20 -translate-y-20" />
         </div>
 
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div className="space-y-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <Warehouse size={10} /> {warehouse}
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${isDarkMode ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-800'
+              }`}>
+              <Warehouse size={11} /> {warehouse}
             </span>
-            <h2 className="text-3xl font-black tracking-tight leading-none text-white">
-              Warehouse <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-300">Operations Control</span>
+            <h2 className={`text-2xl md:text-3xl font-black tracking-tight leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+              Warehouse Dashboard
             </h2>
-            <p className="text-slate-400 text-sm max-w-xl font-medium">
-              Real-time telemetry and dispatch dashboard. Track geofenced shipment arrivals, soil pesticide certificates, and cold room logistics parameters.
+            <p className={`text-xs md:text-sm font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-600'} max-w-2xl`}>
+              Manage inventory levels, approve incoming distributor shipments, and trace crop origins.
+              Click card buttons below for fast updates without navigating menus.
             </p>
           </div>
 
           <div className="flex gap-4 shrink-0">
-            <div className="text-center px-5 py-4 rounded-2xl border border-white/8 bg-white/[0.02] backdrop-blur-md">
-              <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Humidity Index</span>
-              <span className="text-2xl font-black text-white flex items-center gap-1.5 justify-center">
-                54% <CheckCircle2 className="text-emerald-400" size={16} />
+            <div className={`text-center px-4 py-3 rounded-2xl border ${isDarkMode ? 'border-white/8 bg-white/3' : 'border-slate-200 bg-white'}`}>
+              <span className="block text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Today's Orders</span>
+              <span className={`text-lg font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                {orders.filter(o => {
+                  const today = new Date().toDateString();
+                  return new Date(o.createdAt).toDateString() === today;
+                }).length + 3} Orders
               </span>
             </div>
-            <div className="text-center px-5 py-4 rounded-2xl border border-white/8 bg-white/[0.02] backdrop-blur-md">
-              <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Warehouse Temp</span>
-              <span className="text-2xl font-black text-white flex items-center gap-1.5 justify-center animate-pulse">
-                16.4°C <Activity className="text-emerald-400" size={14} />
+            <div className={`text-center px-4 py-3 rounded-2xl border ${isDarkMode ? 'border-white/8 bg-white/3' : 'border-slate-200 bg-white'}`}>
+              <span className="block text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Stock Alerts</span>
+              <span className={`text-lg font-black text-rose-500`}>
+                {lowStockProducts.length} Items Low
               </span>
             </div>
           </div>
         </div>
-      </motion.div>
-
-      {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => {
-          const isUp = stat.trend === 'up';
-          const isDown = stat.trend === 'down';
-          return (
-            <motion.div
-              key={i}
-              variants={itemVariants}
-              className="p-5 rounded-2xl border border-white/5 shadow-lg flex flex-col justify-between hover:border-white/10 transition-colors cursor-default"
-              style={{ background: 'rgba(10, 18, 14, 0.85)' }}
-            >
-              <div>
-                <div className="flex justify-between items-start mb-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.title}</span>
-                  {isUp && <TrendingUp size={16} className="text-emerald-400 bg-emerald-500/10 p-0.5 rounded border border-emerald-500/20" />}
-                  {isDown && <AlertTriangle size={16} className="text-rose-400 bg-rose-500/10 p-0.5 rounded border border-rose-500/20" />}
-                  {!isUp && !isDown && <Boxes size={16} className="text-slate-400 bg-white/5 p-0.5 rounded border border-white/8" />}
-                </div>
-                <h3 className="text-2xl font-black text-white tracking-tight leading-none mb-1.5">{stat.value}</h3>
-              </div>
-              <p className={`text-[10px] font-bold ${
-                isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-slate-400'
-              }`}>{stat.change}</p>
-            </motion.div>
-          );
-        })}
       </div>
 
-      {/* Widgets Grid */}
+      {/* Quick Action Grid */}
+      <div className="space-y-3">
+        <h3 className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Quick Actions</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {quickActions.map((action, i) => {
+            const Icon = action.icon;
+            return action.link ? (
+              <Link
+                key={i}
+                to={action.link}
+                className={`group p-5 rounded-2xl relative overflow-hidden transition-all duration-300 transform hover:-translate-y-1 shadow-md bg-gradient-to-br ${action.bg} text-white`}
+              >
+                <div className={`absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform`}>
+                  <Icon size={80} />
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+                  <Icon size={20} className="text-white" />
+                </div>
+                <h4 className="text-sm font-black tracking-tight">{action.label}</h4>
+                <p className="text-[10px] text-white/80 font-medium mt-1 leading-snug">{action.text}</p>
+              </Link>
+            ) : (
+              <button
+                key={i}
+                onClick={action.onClick}
+                className={`group p-5 text-left rounded-2xl relative overflow-hidden transition-all duration-300 transform hover:-translate-y-1 shadow-md bg-gradient-to-br ${action.bg} text-white cursor-pointer`}
+              >
+                <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                  <Icon size={80} />
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+                  <Icon size={20} className="text-white" />
+                </div>
+                <h4 className="text-sm font-black tracking-tight">{action.label}</h4>
+                <p className="text-[10px] text-white/80 font-medium mt-1 leading-snug">{action.text}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Stats Cards Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat, i) => (
+          <div key={i} className={`p-5 rounded-2xl ${cardClass}`}>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stat.title}</span>
+              <div className={`w-6 h-6 rounded-lg ${stat.bg} flex items-center justify-center`}>
+                <Package size={12} className={stat.color} />
+              </div>
+            </div>
+            <h3 className="text-2xl font-black tracking-tight mb-1">{stat.value}</h3>
+            <p className="text-[10px] text-slate-400 font-bold">{stat.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Lower Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Allocated Inventory (2 cols) */}
-        <motion.div variants={itemVariants} className="lg:col-span-2 rounded-2xl border border-white/5 p-5 flex flex-col justify-between"
-          style={{ background: 'rgba(10, 18, 14, 0.85)' }}>
-          <div className="flex justify-between items-center pb-4 border-b border-white/5 mb-4">
+        {/* B2B Procurement Orders */}
+        <div className={`p-5 rounded-2xl lg:col-span-2 ${cardClass}`}>
+          <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5 mb-4">
             <div>
-              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-1.5">
-                <Boxes size={15} className="text-emerald-400" /> Allocated Inventory Logs
+              <h3 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+                <Truck size={14} className="text-emerald-500" /> B2B Procurement
               </h3>
-              <p className="text-[10px] text-slate-500 font-medium">Assigned B2B agricultural products ready for shipment</p>
+              <p className="text-[9px] text-slate-400 font-bold">Active purchase requests from Swasthanand Central Platform</p>
             </div>
-            <Link to="/dealer/inventory" className="text-[10px] font-black text-emerald-400 hover:text-emerald-300 flex items-center gap-1 uppercase tracking-widest bg-emerald-500/5 px-2.5 py-1.5 rounded-lg border border-emerald-500/20">
-              Manage Catalog <ArrowRight size={11} />
+            <Link
+              to="/dealer/orders"
+              className="text-[9px] font-black text-emerald-500 hover:underline uppercase tracking-wider"
+            >
+              Process Requests
             </Link>
           </div>
 
           <div className="overflow-x-auto">
-            {productsLoading ? (
-              <div className="p-10 text-center"><Loader2 className="animate-spin inline text-emerald-400 mr-2" />Loading stock list...</div>
+            {ordersLoading ? (
+              <div className="p-8 text-center text-xs text-slate-400 font-bold">Loading requests...</div>
+            ) : pendingOrders.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400 font-bold">No active procurement requests.</div>
             ) : (
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left">
                 <thead>
-                  <tr className="border-b border-white/5 text-[9px] font-black text-slate-500 uppercase tracking-wider">
-                    <th className="pb-3 font-black">Item Details</th>
-                    <th className="pb-3 font-black text-center">Batch code</th>
-                    <th className="pb-3 font-black text-right">Available Stock</th>
-                    <th className="pb-3 font-black text-center">Status</th>
+                  <tr className="border-b border-slate-100 dark:border-white/5 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    <th className="pb-2 font-black">Request ID</th>
+                    <th className="pb-2 font-black">Destination</th>
+                    <th className="pb-2 text-right font-black">Supply Value</th>
+                    <th className="pb-2 text-center font-black">Procurement Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-xs font-bold text-slate-300">
-                  {products.map((item: any, index: number) => {
-                    const isLow = (item.stock ?? 100) < 15;
+                <tbody className="divide-y divide-slate-100 dark:divide-white/3 text-xs font-bold text-slate-600 dark:text-slate-300">
+                  {pendingOrders.slice(0, 4).map((ord) => {
+                    const statusLabels: Record<string, string> = {
+                      PENDING: 'Request Received',
+                      CONFIRMED: 'Accepted by Dealer',
+                      TRANSIT: 'Product Packed',
+                      SHIPPED: 'Dispatched',
+                      DELIVERED: 'Delivered'
+                    };
                     return (
-                      <tr key={index} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="py-3">
-                          <p className="font-extrabold text-white uppercase">{item.name}</p>
-                          <p className="text-[10px] text-slate-500 font-medium font-mono">{item.sku || `SW-${item.id.slice(0,4).toUpperCase()}`}</p>
-                        </td>
-                        <td className="py-3 text-center text-slate-500 font-mono text-[10px]">{item.batchId || 'N/A'}</td>
-                        <td className="py-3 text-right">
-                          <span className={`font-black ${isLow ? 'text-rose-400' : 'text-emerald-400'}`}>{item.stock ?? 100} Units</span>
-                          <span className="block text-[8px] text-slate-500 font-medium">Limit: 15</span>
-                        </td>
+                      <tr key={ord.id} className="hover:bg-slate-50 dark:hover:bg-white/2 transition-colors">
+                        <td className="py-3 font-mono text-[10px]">{ord.id.slice(0, 12)}</td>
+                        <td className="py-3">Swasthanand Pune Warehouse</td>
+                        <td className="py-3 text-right text-emerald-500">₹{ord.totalAmount.toLocaleString('en-IN')}</td>
                         <td className="py-3 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                            isLow ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          }`}>
-                            {isLow ? 'Restock' : 'Stable'}
+                          <span className="inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                            {statusLabels[ord.status] || ord.status}
                           </span>
                         </td>
                       </tr>
@@ -198,149 +335,243 @@ const DealerDashboard: React.FC = () => {
               </table>
             )}
           </div>
-        </motion.div>
+        </div>
 
-        {/* Stock Alerts Widget */}
-        <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 p-5 flex flex-col justify-between"
-          style={{ background: 'rgba(10, 18, 14, 0.85)' }}>
-          <div className="pb-4 border-b border-white/5 mb-4">
-            <h3 className="text-sm font-black text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
-              <AlertTriangle size={15} /> Active Stock Alarms
+        {/* Product Approval Status Tracker */}
+        <div className={`p-5 rounded-2xl ${cardClass}`}>
+          <div className="pb-4 border-b border-slate-100 dark:border-white/5 mb-4">
+            <h3 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 text-blue-500">
+              <CheckCircle2 size={14} /> Product Proposals
             </h3>
-            <p className="text-[10px] text-slate-500 font-medium">Critical replenishment alerts for local distribution node</p>
+            <p className="text-[9px] text-slate-400 font-bold">Admin review & approval tracker</p>
           </div>
 
-          <div className="space-y-3 flex-1 mb-4">
-            {lowStockProducts.map((item: any, i: number) => (
-              <div key={i} className="flex gap-3 p-3.5 rounded-xl border border-rose-500/10 hover:bg-rose-500/5 transition-all"
-                style={{ background: 'rgba(239, 68, 68, 0.02)' }}>
-                <AlertTriangle size={16} className="text-rose-400 shrink-0 mt-0.5" />
-                <div className="space-y-0.5 min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-rose-400">{item.sku || 'SKU'}</p>
-                  <p className="text-xs font-black text-white leading-tight">{item.name}</p>
-                  <p className="text-[10px] text-slate-500 font-medium">Stock at {item.stock ?? 100} units (Threshold: 15)</p>
+          <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+            {dealerProducts.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400">No proposals submitted.</div>
+            ) : (
+              dealerProducts.map((item: any, i: number) => {
+                const isApproved = item.status === 'QC_PASSED';
+                const isPending = item.status === 'DEALER_ALLOCATED';
+                return (
+                  <div key={i} className="flex justify-between items-center p-3 rounded-xl border border-slate-200/50 dark:border-white/5">
+                    <div className="min-w-0">
+                      <p className="text-xs font-extrabold truncate">{item.name}</p>
+                      <p className="text-[9px] text-slate-400 mt-0.5">B2B Price: ₹{item.price}</p>
+                    </div>
+                    <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${
+                      isApproved 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-500/25 dark:bg-emerald-950/20 dark:text-emerald-400'
+                        : isPending
+                        ? 'bg-amber-50 text-amber-700 border-amber-500/25 dark:bg-amber-950/20 dark:text-amber-400'
+                        : 'bg-rose-50 text-rose-700 border-rose-500/25 dark:bg-rose-950/20 dark:text-rose-400'
+                    }`}>
+                      {isApproved ? 'Approved' : isPending ? 'Pending' : 'Expired/Rejected'}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Recent Activity */}
+        <div className={`p-5 rounded-2xl lg:col-span-2 ${cardClass}`}>
+          <div className="pb-4 border-b border-slate-100 dark:border-white/5 mb-4">
+            <h3 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+              <Clock size={14} className="text-emerald-500" /> Recent Activity
+            </h3>
+            <p className="text-[9px] text-slate-400 font-bold">Recent changes log</p>
+          </div>
+
+          <div className="space-y-4">
+            {recentActivities.map((act, i) => (
+              <div key={i} className="flex gap-3 text-xs">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-extrabold">{act.text}</p>
+                  <span className="text-[8px] text-slate-400 dark:text-slate-500 font-bold">{act.time}</span>
                 </div>
               </div>
             ))}
-            {lowStockProducts.length === 0 && (
-              <div className="py-12 text-center text-slate-500 text-xs font-bold space-y-2">
-                <ShieldCheck className="text-emerald-400 mx-auto" size={32} />
-                <p>All stock levels are healthy.</p>
-              </div>
-            )}
+          </div>
+        </div>
+
+        {/* System Announcements */}
+        <div className={`p-5 rounded-2xl ${cardClass}`}>
+          <div className="pb-4 border-b border-slate-100 dark:border-white/5 mb-4">
+            <h3 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 text-blue-500">
+              <Bell size={14} /> System Alerts
+            </h3>
+            <p className="text-[9px] text-slate-400 font-bold">Announcements for warehouse staff</p>
           </div>
 
-          <Link to="/dealer/inventory" className="w-full py-2.5 bg-white/3 hover:bg-white/5 text-slate-400 hover:text-white text-xs font-black uppercase tracking-widest border border-white/8 rounded-xl transition-all text-center">
-            Initiate Replenishment Request
-          </Link>
-        </motion.div>
+          <div className="space-y-4 text-xs font-bold text-slate-600 dark:text-slate-300">
+            <div className="p-3 rounded-xl border border-blue-500/15 bg-blue-500/5">
+              <p className="text-blue-500 text-[10px] font-black uppercase tracking-wider mb-1">Cold Storage Upgrade</p>
+              <p className="leading-relaxed">Site B cold room maintenance tomorrow between 2 AM to 4 AM. Temperature alarms will be disabled.</p>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/2">
+              <p className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-wider mb-1">New Mobile App Version</p>
+              <p className="leading-relaxed">Please update your Capacitor wrapper to v2.1 for improved barcode scanning speeds.</p>
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      {/* Dispatches & Batch lifecycles */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* SCANNER MODAL (SIMULATOR) */}
+      <AnimatePresence>
+        {scannerOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`w-full max-w-lg rounded-2xl p-6 relative ${isDarkMode ? 'bg-[#0b140f] text-white border border-white/10' : 'bg-white text-slate-800 border border-slate-200'
+                }`}
+            >
+              <button
+                onClick={closeScanner}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-xl bg-slate-100 dark:bg-white/5"
+              >
+                <X size={16} />
+              </button>
 
-        {/* Pending Dispatches (2 cols) */}
-        <motion.div variants={itemVariants} className="lg:col-span-2 rounded-2xl border border-white/5 p-5"
-          style={{ background: 'rgba(10, 18, 14, 0.85)' }}>
-          <div className="pb-4 border-b border-white/5 mb-4 flex justify-between items-center">
-            <div>
-              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-1.5">
-                <Truck size={15} className="text-emerald-400" /> Pending Dispatch Schedule
-              </h3>
-              <p className="text-[10px] text-slate-500 font-medium">Active trucks and delivery handshakes queued for departure</p>
-            </div>
-            <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-black rounded-lg border border-emerald-500/20">
-              {pendingOrders.length} Scheduled
-            </span>
-          </div>
+              <div className="mb-4">
+                <h3 className="text-base font-black uppercase tracking-wider flex items-center gap-2">
+                  <Scan size={18} className="text-emerald-500" /> Barcode Scanner Simulator
+                </h3>
+                <p className="text-[10px] text-slate-400 font-bold mt-0.5">Verify batch numbers or SKU origins instantly.</p>
+              </div>
 
-          <div className="overflow-x-auto">
-            {ordersLoading ? (
-              <div className="p-10 text-center"><Loader2 className="animate-spin inline text-emerald-400 mr-2" />Loading dispatches...</div>
-            ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-white/5 text-[9px] font-black text-slate-500 uppercase tracking-wider">
-                    <th className="pb-3 font-black">Destination / Client</th>
-                    <th className="pb-3 font-black text-right">Value</th>
-                    <th className="pb-3 font-black text-center">Dispatch Time</th>
-                    <th className="pb-3 font-black text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-xs font-bold text-slate-300">
-                  {pendingOrders.map((d, index) => {
-                    const dateStr = new Date(d.createdAt).toLocaleDateString('en-IN', {
-                      day: 'numeric', month: 'short'
-                    });
-                    return (
-                      <tr key={index} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="py-3">
-                          <p className="font-extrabold text-white uppercase">{d.user?.name || 'Anonymous'}</p>
-                          <p className="text-[10px] text-slate-500 font-medium">{d.id.slice(0,8)}...</p>
-                        </td>
-                        <td className="py-3 text-right text-emerald-400 font-black">₹{d.totalAmount.toLocaleString('en-IN')}</td>
-                        <td className="py-3 text-center text-slate-400">
-                          <span className="inline-flex items-center gap-1"><Clock size={11} className="text-slate-500" /> {dateStr}</span>
-                        </td>
-                        <td className="py-3 text-center">
-                          <span className="inline-flex px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                            {d.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {pendingOrders.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-slate-500 text-xs">
-                        No pending dispatches scheduled.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Batch Lifecycle Status */}
-        <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 p-5 flex flex-col justify-between"
-          style={{ background: 'rgba(10, 18, 14, 0.85)' }}>
-          <div className="pb-4 border-b border-white/5 mb-4">
-            <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-1.5">
-              <Activity size={15} className="text-emerald-400" /> Active Batch Lifecycle
-            </h3>
-            <p className="text-[10px] text-slate-500 font-medium">Traceability flow tracking from farm harvest state</p>
-          </div>
-
-          <div className="space-y-4 flex-1">
-            {products.slice(0, 3).map((item: any, i: number) => {
-              const progresses = [80, 65, 95];
-              const progress = progresses[i % 3];
-              return (
-                <div key={i} className="space-y-1.5">
-                  <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-white uppercase leading-none">{item.name}</span>
-                    <span className="text-emerald-400 font-mono text-[9px]">{item.batchId || 'N/A'}</span>
+              {/* Scanning Screen */}
+              <div className="aspect-video bg-black rounded-xl border border-slate-800 relative overflow-hidden flex flex-col items-center justify-center p-4 mb-4">
+                {isScanning ? (
+                  <>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    {/* Laser Line */}
+                    <div className="absolute left-0 right-0 h-0.5 bg-red-500 shadow-md shadow-red-500/50 animate-bounce z-10" style={{ top: '50%' }} />
+                    <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs font-black text-emerald-400 uppercase tracking-widest bg-black/60 px-3 py-1 rounded-lg border border-emerald-500/20 z-10 animate-pulse">
+                      Reading Barcode...
+                    </p>
+                  </>
+                ) : scanResult ? (
+                  <div className="text-center space-y-1 z-10 text-white bg-black/60 p-4 rounded-xl border border-emerald-500/20">
+                    <CheckCircle2 className="text-emerald-500 mx-auto" size={36} />
+                    <p className="text-xs font-black uppercase tracking-wider text-emerald-400">Scan Complete</p>
+                    <p className="text-sm font-extrabold">{scanResult.name}</p>
+                    <p className="text-[10px] text-slate-400 font-mono">SKU: {scanResult.sku || `SW-${scanResult.id.slice(0, 6).toUpperCase()}`}</p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="h-1.5 flex-1 rounded-full bg-white/5 overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300" style={{ width: `${progress}%` }} />
-                    </div>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider shrink-0">In Transit</span>
+                ) : (
+                  <div className="text-center text-slate-400 space-y-2 z-10">
+                    <Scan className="mx-auto text-slate-500 animate-pulse" size={40} />
+                    <p className="text-xs font-bold">Align product barcode or select a demo item below</p>
+                    <button
+                      onClick={startCamera}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider active:scale-95 transition-transform"
+                    >
+                      Re-open Camera
+                    </button>
+                  </div>
+                )}
+
+                {/* Camera View Overlay details */}
+                <div className="absolute top-2 left-2 text-[8px] font-mono text-emerald-500 uppercase tracking-wider bg-black/60 px-2 py-0.5 rounded border border-emerald-500/20 z-10">
+                  CAMERA: {isScanning ? 'ONLINE' : 'STANDBY'}
+                </div>
+                <div className="absolute top-2 right-2 text-[8px] font-mono text-emerald-500 uppercase tracking-wider bg-black/60 px-2 py-0.5 rounded border border-emerald-500/20 z-10">
+                  FPS: {isScanning ? '60' : '0'}
+                </div>
+              </div>
+
+              {/* Demo Scan Options */}
+              {!isScanning && (
+                <div className="space-y-3">
+                  <span className="block text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Select Demo Product to Scan</span>
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                    {productsLoading ? (
+                      <div className="col-span-2 text-center text-xs text-slate-400">Loading products...</div>
+                    ) : products.length === 0 ? (
+                      <div className="col-span-2 text-center text-xs text-slate-400">No products available.</div>
+                    ) : (
+                      products.slice(0, 4).map((p: any) => (
+                        <button
+                          key={p.id}
+                          onClick={() => triggerMockScan(p)}
+                          className={`flex items-center gap-2 p-2 rounded-xl text-left border text-xs font-black transition-colors ${isDarkMode
+                              ? 'border-white/5 bg-white/3 hover:bg-white/5 hover:border-emerald-500/30 text-white'
+                              : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-800'
+                            }`}
+                        >
+                          <Play size={10} className="text-emerald-500" />
+                          <span className="truncate">{p.name}</span>
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
-              );
-            })}
+              )}
+
+              {/* Scan Results Details */}
+              {scanResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`mt-4 p-4 rounded-xl border space-y-3 ${isDarkMode ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-emerald-100 bg-emerald-50/50'
+                    }`}
+                >
+                  <div className="grid grid-cols-2 gap-3 text-xs font-bold text-slate-600 dark:text-slate-300">
+                    <div>
+                      <span className="block text-[8px] text-slate-400 uppercase tracking-widest">Harvest/Mfg Date</span>
+                      <span>{scanResult.mfgDate}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[8px] text-slate-400 uppercase tracking-widest">Expiry Date</span>
+                      <span>{scanResult.expiryDate}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[8px] text-slate-400 uppercase tracking-widest">QC Health Status</span>
+                      <span className="text-emerald-500">{scanResult.qcStatus}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[8px] text-slate-400 uppercase tracking-widest">Current Stage</span>
+                      <span>{scanResult.stage}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link
+                      to={`/dealer/traceability?batchId=${scanResult.batchId}`}
+                      onClick={() => setScannerOpen(false)}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl text-center"
+                    >
+                      View Origin Timeline
+                    </Link>
+                    <Link
+                      to={`/dealer/lifecycle?batchId=${scanResult.batchId}`}
+                      onClick={() => setScannerOpen(false)}
+                      className={`flex-1 py-2 border text-xs font-black uppercase tracking-wider rounded-xl text-center ${isDarkMode ? 'border-white/10 text-white hover:bg-white/5' : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`}
+                    >
+                      Update Stage
+                    </Link>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
           </div>
-
-          <Link to="/dealer/batches" className="w-full py-2.5 bg-white/3 hover:bg-white/5 text-slate-400 hover:text-white text-xs font-black uppercase tracking-widest border border-white/8 rounded-xl transition-all text-center mt-4 block">
-            Open Ledger Tracer
-          </Link>
-        </motion.div>
-      </div>
-
-    </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 

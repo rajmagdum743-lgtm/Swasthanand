@@ -28,7 +28,9 @@ import DealerLayout from './layouts/DealerLayout';
 import DealerDashboard from './pages/dealer/DealerDashboard';
 import DealerInventory from './pages/dealer/DealerInventory';
 import DealerOrders from './pages/dealer/DealerOrders';
-import DealerBatches from './pages/dealer/DealerBatches';
+import DealerTraceability from './pages/dealer/DealerTraceability';
+import DealerLifecycle from './pages/dealer/DealerLifecycle';
+import DealerNotifications from './pages/dealer/DealerNotifications';
 import DealerReports from './pages/dealer/DealerReports';
 import DealerProfile from './pages/dealer/DealerProfile';
 
@@ -89,7 +91,9 @@ function App() {
           <Route path="dashboard" element={<DealerDashboard />} />
           <Route path="inventory" element={<DealerInventory />} />
           <Route path="orders" element={<DealerOrders />} />
-          <Route path="batches" element={<DealerBatches />} />
+          <Route path="traceability" element={<DealerTraceability />} />
+          <Route path="lifecycle" element={<DealerLifecycle />} />
+          <Route path="notifications" element={<DealerNotifications />} />
           <Route path="reports" element={<DealerReports />} />
           <Route path="profile" element={<DealerProfile />} />
         </Route>

@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { Package, Search, Plus, Filter, Edit, Trash2, ShieldAlert, X, Sparkles, Check, Info } from 'lucide-react';
+import { Package, Search, Plus, Edit, Trash2, ShieldAlert, X, Sparkles, Check, Info } from 'lucide-react';
 import { useProducts, type Product } from '../../context/ProductContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../../config/api';
 
 const AdminProducts: React.FC = () => {
   const { products, addProduct, updateProduct, deleteProduct, categories } = useProducts();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
-  
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  
+
   // Form State
   const [formData, setFormData] = useState({
     name: '',
@@ -101,6 +102,18 @@ const AdminProducts: React.FC = () => {
     }
   };
 
+  const handleApprove = async (id: string, name: string) => {
+    try {
+      await fetch(`${API_BASE_URL}/api/products/${id}/approve`, { method: 'PUT' });
+      triggerNotification(`Product "${name}" approved successfully!`);
+      // Optional: Refresh products list by calling a context method if available
+      // For now we'll just trigger a page reload or context refresh if it exists
+      window.location.reload();
+    } catch (err) {
+      triggerNotification('Failed to approve product', 'error');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedData = {
@@ -132,7 +145,7 @@ const AdminProducts: React.FC = () => {
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-      
+
       {/* Toast Notification */}
       <AnimatePresence>
         {notification && (
@@ -140,11 +153,10 @@ const AdminProducts: React.FC = () => {
             initial={{ opacity: 0, y: -20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.9 }}
-            className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3.5 rounded-2xl shadow-xl border text-xs font-black uppercase tracking-wider ${
-              notification.type === 'error' 
-                ? 'bg-rose-50 border-rose-200 text-rose-600' 
+            className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3.5 rounded-2xl shadow-xl border text-xs font-black uppercase tracking-wider ${notification.type === 'error'
+                ? 'bg-rose-50 border-rose-200 text-rose-600'
                 : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-            }`}
+              }`}
           >
             {notification.type === 'error' ? <ShieldAlert size={16} /> : <Check size={16} />}
             <span>{notification.message}</span>
@@ -158,7 +170,7 @@ const AdminProducts: React.FC = () => {
           <h2 className="text-2xl font-black text-slate-800">Products & Catalog</h2>
           <p className="text-xs text-slate-500 font-medium">Add, update, or remove organic products from Swasthanand catalog</p>
         </div>
-        <button 
+        <button
           onClick={handleOpenAdd}
           className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-black text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 shadow-lg shadow-teal-100/50 active:scale-95 transition-transform"
         >
@@ -228,24 +240,32 @@ const AdminProducts: React.FC = () => {
                   <td className="p-4 text-right text-teal-600 font-black">₹{p.price}</td>
                   <td className="p-4 text-center text-slate-500 font-mono text-[10px]">{p.batchId || 'N/A'}</td>
                   <td className="p-4 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                      (p.stock ?? 100) < 15 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${(p.stock ?? 100) < 15 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                      }`}>
                       {p.stock ?? 100} Units
                     </span>
                   </td>
                   <td className="p-4 text-center">
                     <div className="flex items-center justify-center gap-1.5">
-                      <button 
+                      {!p.isApproved && (
+                        <button
+                          onClick={() => handleApprove(p.id, p.name)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                          title="Approve"
+                        >
+                          <Check size={14} />
+                        </button>
+                      )}
+                      <button
                         onClick={() => handleOpenEdit(p)}
-                        className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-all" 
+                        className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-all"
                         title="Edit"
                       >
                         <Edit size={14} />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDelete(p.id, p.name)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" 
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                         title="Delete"
                       >
                         <Trash2 size={14} />
@@ -273,16 +293,16 @@ const AdminProducts: React.FC = () => {
       <AnimatePresence>
         {isModalOpen && (
           <>
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 0.5 }} 
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="fixed inset-0 bg-slate-900 z-[150]" 
+              className="fixed inset-0 bg-slate-900 z-[150]"
             />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white rounded-3xl shadow-2xl z-[151] overflow-hidden max-h-[90vh] flex flex-col"
             >
@@ -294,7 +314,7 @@ const AdminProducts: React.FC = () => {
                     {modalMode === 'add' ? 'Add New Product' : 'Modify Product'}
                   </h3>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsModalOpen(false)}
                   className="p-1.5 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors"
                 >
@@ -304,18 +324,18 @@ const AdminProducts: React.FC = () => {
 
               {/* Form Scroll Container */}
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
-                
+
                 {/* Section 1: Basic Info */}
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 border-b pb-2">
                     <Info size={12} /> Basic Information
                   </h4>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Product Name *</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
                         value={formData.name}
                         onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -325,8 +345,8 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">SKU / Code *</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
                         value={formData.sku}
                         onChange={e => setFormData({ ...formData, sku: e.target.value })}
@@ -339,7 +359,7 @@ const AdminProducts: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Category *</label>
-                      <input 
+                      <input
                         type="text"
                         required
                         value={formData.category}
@@ -350,8 +370,8 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Price (INR) *</label>
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         required
                         value={formData.price}
                         onChange={e => setFormData({ ...formData, price: e.target.value })}
@@ -361,8 +381,8 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Initial Stock Level *</label>
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         required
                         value={formData.stock}
                         onChange={e => setFormData({ ...formData, stock: e.target.value })}
@@ -374,8 +394,8 @@ const AdminProducts: React.FC = () => {
 
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Product Image URL</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={formData.image}
                       onChange={e => setFormData({ ...formData, image: e.target.value })}
                       placeholder="/images/products/..."
@@ -385,7 +405,7 @@ const AdminProducts: React.FC = () => {
 
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Retail Description *</label>
-                    <textarea 
+                    <textarea
                       required
                       value={formData.description}
                       onChange={e => setFormData({ ...formData, description: e.target.value })}
@@ -397,7 +417,7 @@ const AdminProducts: React.FC = () => {
 
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Ayurvedic / Benefits Description</label>
-                    <textarea 
+                    <textarea
                       value={formData.benefitsDescription}
                       onChange={e => setFormData({ ...formData, benefitsDescription: e.target.value })}
                       placeholder="Ayurvedic text references, dietary features..."
@@ -416,8 +436,8 @@ const AdminProducts: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Farm Batch Code</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.batchId}
                         onChange={e => setFormData({ ...formData, batchId: e.target.value })}
                         placeholder="e.g. F-SATARA-2024-A"
@@ -426,8 +446,8 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Geographical Origin</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.origin}
                         onChange={e => setFormData({ ...formData, origin: e.target.value })}
                         placeholder="e.g. Satara, Maharashtra"
@@ -439,8 +459,8 @@ const AdminProducts: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Harvest Date</label>
-                      <input 
-                        type="date" 
+                      <input
+                        type="date"
                         value={formData.harvestDate}
                         onChange={e => setFormData({ ...formData, harvestDate: e.target.value })}
                         className="w-full bg-slate-50 border border-slate-200 focus:border-teal-500 focus:bg-white p-3 rounded-xl text-xs font-bold outline-none"
@@ -448,8 +468,8 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Weather Temperature</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.weatherTemp}
                         onChange={e => setFormData({ ...formData, weatherTemp: e.target.value })}
                         placeholder="e.g. 28°C"
@@ -458,8 +478,8 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Growth Quality</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.growthQuality}
                         onChange={e => setFormData({ ...formData, growthQuality: e.target.value })}
                         placeholder="e.g. Excellent / A+"
@@ -471,8 +491,8 @@ const AdminProducts: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-1 col-span-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Soil Organic Matter</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.organicMatter}
                         onChange={e => setFormData({ ...formData, organicMatter: e.target.value })}
                         placeholder="e.g. 4.2%"
@@ -481,8 +501,8 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div className="space-y-1 col-span-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Nitrogen Content</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.nitrogen}
                         onChange={e => setFormData({ ...formData, nitrogen: e.target.value })}
                         placeholder="e.g. 1.8%"
@@ -491,8 +511,8 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div className="space-y-1 col-span-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Pesticides %</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.zeroPesticides}
                         onChange={e => setFormData({ ...formData, zeroPesticides: e.target.value })}
                         placeholder="e.g. Verified / 0.0%"
@@ -501,8 +521,8 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div className="space-y-1 col-span-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Certificate Link</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.certificateUrl}
                         onChange={e => setFormData({ ...formData, certificateUrl: e.target.value })}
                         placeholder="https://..."
@@ -514,14 +534,14 @@ const AdminProducts: React.FC = () => {
 
                 {/* Footer Actions */}
                 <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
                     className="px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider text-slate-500 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     type="submit"
                     className="px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 shadow-lg shadow-teal-100/50"
                   >

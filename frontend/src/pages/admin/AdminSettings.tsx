@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Shield, Key, Bell, Database, Save } from 'lucide-react';
+import { Shield, Database, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const AdminSettings: React.FC = () => {

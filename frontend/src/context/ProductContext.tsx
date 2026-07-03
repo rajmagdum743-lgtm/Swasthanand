@@ -19,6 +19,8 @@ export interface Product {
   nitrogen?: string;
   zeroPesticides?: string;
   certificateUrl?: string;
+  isApproved?: boolean;
+  benefitsDescription?: string;
 }
 
 interface ProductContextType {

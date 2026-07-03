@@ -263,8 +263,11 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialTab
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/orders/user/${user.id}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch orders: ${response.status}`);
+      }
       const data = await response.json();
-      setOrders(data || []);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {

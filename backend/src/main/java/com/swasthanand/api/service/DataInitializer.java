@@ -5,6 +5,10 @@ import com.swasthanand.api.model.User;
 import com.swasthanand.api.model.FarmBatch;
 import com.swasthanand.api.repository.ProductRepository;
 import com.swasthanand.api.repository.FarmBatchRepository;
+import com.swasthanand.api.model.DealershipNode;
+import com.swasthanand.api.repository.DealershipNodeRepository;
+import com.swasthanand.api.model.Order;
+import com.swasthanand.api.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -26,6 +30,8 @@ public class DataInitializer implements CommandLineRunner {
     private final UserService userService;
     private final FarmBatchRepository farmBatchRepository;
     private final PasswordEncoder passwordEncoder;
+    private final DealershipNodeRepository dealershipNodeRepository;
+    private final OrderRepository orderRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -35,6 +41,7 @@ public class DataInitializer implements CommandLineRunner {
             .then(initializeDealer())
             .then(initializeAshishPassword())
             .then(initializeSampleBatchAndProducts())
+            .then(initializeSampleOrders())
             .doOnError(err -> log.error("Error during data initialization: ", err))
             .doOnSuccess(v -> log.info("Swasthanand Data Initialized Successfully."))
             .subscribe();
@@ -67,6 +74,7 @@ public class DataInitializer implements CommandLineRunner {
         String dealerPhone = "9284939947";
         return userService.findByPhone(dealerPhone)
             .flatMap(existingDealer -> {
+                existingDealer.setName("Swasthanand Dealer");
                 existingDealer.setPassword(passwordEncoder.encode("admin123"));
                 existingDealer.setRole(User.Role.DEALER);
                 existingDealer.setIsApproved(true);
@@ -83,7 +91,21 @@ public class DataInitializer implements CommandLineRunner {
                         .build();
                 return userService.registerUser(dealer);
             }))
-            .then();
+            .flatMap(dealer -> {
+                return dealershipNodeRepository.findByAssignedDealerId(dealer.getId())
+                    .switchIfEmpty(Mono.defer(() -> {
+                        DealershipNode node = DealershipNode.builder()
+                            .id("satara-coop-node-id")
+                            .name("Satara Agri-Coop Center")
+                            .latitude(17.6805)
+                            .longitude(73.9918)
+                            .geofenceRadiusKm(5.0)
+                            .assignedDealerId(dealer.getId())
+                            .build();
+                        return dealershipNodeRepository.save(node);
+                    }))
+                    .then();
+            });
     }
 
     private Mono<Void> initializeAshishPassword() {
@@ -117,7 +139,8 @@ public class DataInitializer implements CommandLineRunner {
                     new BigDecimal("299.00"),
                     "Spices",
                     Arrays.asList("weight-loss", "immunity", "inflammation"),
-                    batch.getId());
+                    batch.getId(),
+                    "satara-coop-node-id");
 
                 Mono<Void> p2 = initializeProduct("Pure A2 Vedic Ghee", 
                     "Hand-churned A2 ghee from grass-fed Desi cows.",
@@ -125,7 +148,8 @@ public class DataInitializer implements CommandLineRunner {
                     new BigDecimal("850.00"),
                     "Dairy",
                     Arrays.asList("weight-loss", "digestion", "skin", "energy"),
-                    batch.getId());
+                    batch.getId(),
+                    "satara-coop-node-id");
 
                 Mono<Void> p3 = initializeProduct("Moringa Powder (Shigru)", 
                     "Organic moringa leaf powder rich in nutrients.",
@@ -133,13 +157,14 @@ public class DataInitializer implements CommandLineRunner {
                     new BigDecimal("199.00"),
                     "Supplements",
                     Arrays.asList("immunity", "joint-pain", "weight-loss", "energy"),
-                    batch.getId());
+                    batch.getId(),
+                    "satara-coop-node-id");
 
                 return Mono.when(p1, p2, p3);
             });
     }
 
-    private Mono<Void> initializeProduct(String name, String desc, String benefit, BigDecimal price, String category, List<String> tags, String batchId) {
+    private Mono<Void> initializeProduct(String name, String desc, String benefit, BigDecimal price, String category, List<String> tags, String batchId, String nodeId) {
         return productRepository.findByNameContainingIgnoreCase(name)
             .collectList()
             .flatMap(existingList -> {
@@ -162,6 +187,8 @@ public class DataInitializer implements CommandLineRunner {
                         .image("/images/products/" + name.toLowerCase().replace(" ", "-").replace("(", "").replace(")", "") + ".jpg")
                         .stock(100)
                         .status(Product.LifecycleState.QC_PASSED)
+                        .dealershipNodeId(nodeId)
+                        .isApproved(true)
                         .build();
                     product.serializeTags();
                     return productRepository.save(product).then();
@@ -171,12 +198,39 @@ public class DataInitializer implements CommandLineRunner {
                     existing.setBenefitsDescription(benefit);
                     existing.setTags(new ArrayList<>(tags));
                     existing.setBatchId(batchId);
+                    existing.setDealershipNodeId(nodeId);
                     if (existing.getStock() == null) {
                         existing.setStock(100);
                     }
+                    existing.setIsApproved(true);
                     existing.serializeTags();
                     return productRepository.save(existing).then();
                 }
             });
+    }
+
+    private Mono<Void> initializeSampleOrders() {
+        return Mono.when(
+            saveOrderIfMissing("B2B-ORD-5819", "dealer-id", new BigDecimal("18450.00"), Order.OrderStatus.CONFIRMED, "satara-coop-node-id"),
+            saveOrderIfMissing("B2B-ORD-4720", "dealer-id", new BigDecimal("8900.00"), Order.OrderStatus.PENDING, "satara-coop-node-id"),
+            saveOrderIfMissing("B2B-ORD-2038", "dealer-id", new BigDecimal("32400.00"), Order.OrderStatus.TRANSIT, "satara-coop-node-id"),
+            saveOrderIfMissing("B2B-ORD-1192", "dealer-id", new BigDecimal("51200.00"), Order.OrderStatus.DELIVERED, "satara-coop-node-id")
+        ).then();
+    }
+
+    private Mono<Void> saveOrderIfMissing(String id, String userId, BigDecimal amount, Order.OrderStatus status, String nodeId) {
+        return orderRepository.findById(id)
+            .switchIfEmpty(Mono.defer(() -> {
+                Order order = Order.builder()
+                    .id(id)
+                    .userId(userId)
+                    .totalAmount(amount)
+                    .status(status)
+                    .dealershipNodeId(nodeId)
+                    .build();
+                order.setNew(true);
+                return orderRepository.save(order);
+            }))
+            .then();
     }
 }

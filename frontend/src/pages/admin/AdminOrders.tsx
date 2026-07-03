@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Search, Eye, Plus, CheckCircle2, AlertCircle, Clock, Loader2, X, RefreshCw, AlertTriangle, Trash2, Edit3, Check } from 'lucide-react';
+import { ShoppingBag, Search, Eye, Plus, CheckCircle2, AlertCircle, Loader2, X, RefreshCw, AlertTriangle, Trash2, Edit3, Check } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
 import { motion, AnimatePresence } from 'framer-motion';
 

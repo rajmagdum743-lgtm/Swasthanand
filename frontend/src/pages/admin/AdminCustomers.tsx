@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Mail, Phone, Calendar, ShoppingCart, Loader2 } from 'lucide-react';
+import { Users, Search, Phone, ShoppingCart, Loader2 } from 'lucide-react';
 import { API_BASE_URL } from '../../config/api';
 import { motion } from 'framer-motion';
 

@@ -3,6 +3,7 @@ import { Eye, MapPin, TreeDeciduous, Info, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../../context/CartContext';
 import { type Product } from '../../context/ProductContext';
+import { API_BASE_URL } from '../../config/api';
 
 interface ProductProps extends Product {
   onTrace: (product: Product) => void;
@@ -18,6 +19,29 @@ const ProductCard: React.FC<ProductProps> = (props) => {
     addToCart({ id, name, price });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
+  };
+
+  const isOutOfStock = props.stock === 0;
+  const [showNotify, setShowNotify] = React.useState(false);
+  const [notifyContact, setNotifyContact] = React.useState('');
+  const [notifyStatus, setNotifyStatus] = React.useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const handleNotifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifyContact) return;
+    setNotifyStatus('loading');
+    try {
+      await fetch(`${API_BASE_URL}/api/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: id, contactInfo: notifyContact })
+      });
+      setNotifyStatus('success');
+      setTimeout(() => setShowNotify(false), 3000);
+    } catch (err) {
+      setNotifyStatus('error');
+      setTimeout(() => setNotifyStatus('idle'), 3000);
+    }
   };
 
   return (
@@ -97,36 +121,81 @@ const ProductCard: React.FC<ProductProps> = (props) => {
         </div>
 
         <div className="space-y-2 pt-2">
-          <button 
-            onClick={handleAdd}
-            disabled={added}
-            className={`w-full ${added ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'btn-premium'} py-3.5 rounded-xl text-center justify-center font-bold relative transition-all duration-300 text-sm`}
-          >
-            <AnimatePresence mode="wait">
-              {added ? (
-                <motion.span 
-                  key="check"
-                  initial={{ opacity: 0, scale: 0.5 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.5 }}
-                  className="flex items-center justify-center gap-2"
-                >
-                  <Check size={16} strokeWidth={3} />
-                  Added to Basket
-                </motion.span>
-              ) : (
-                <motion.span 
-                  key="text"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center justify-center gap-1.5"
-                >
-                  Add to Basket
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </button>
+          {isOutOfStock ? (
+            <div className="space-y-2">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <p className="text-[10px] font-bold text-amber-800 leading-tight">
+                  This product is currently out of stock. We are working with our trusted dealers to restock it as quickly as possible.
+                </p>
+              </div>
+              <AnimatePresence mode="wait">
+                {!showNotify ? (
+                  <motion.button 
+                    key="notify-btn"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    onClick={() => setShowNotify(true)}
+                    className="w-full py-3.5 bg-slate-900 text-white rounded-xl text-center font-bold text-sm hover:bg-slate-800 transition-colors"
+                  >
+                    Notify Me When Available
+                  </motion.button>
+                ) : (
+                  <motion.form 
+                    key="notify-form"
+                    initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                    onSubmit={handleNotifySubmit}
+                    className="flex flex-col gap-2"
+                  >
+                    <input 
+                      type="text" 
+                      placeholder="Email or Phone Number" 
+                      value={notifyContact}
+                      onChange={e => setNotifyContact(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-amber-500"
+                      required
+                    />
+                    <button 
+                      type="submit" 
+                      disabled={notifyStatus === 'loading' || notifyStatus === 'success'}
+                      className={`w-full py-2.5 rounded-xl text-xs font-bold transition-colors ${notifyStatus === 'success' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white hover:bg-amber-600'}`}
+                    >
+                      {notifyStatus === 'loading' ? 'Subscribing...' : notifyStatus === 'success' ? 'Subscribed!' : 'Confirm'}
+                    </button>
+                  </motion.form>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <button 
+              onClick={handleAdd}
+              disabled={added}
+              className={`w-full ${added ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'btn-premium'} py-3.5 rounded-xl text-center justify-center font-bold relative transition-all duration-300 text-sm`}
+            >
+              <AnimatePresence mode="wait">
+                {added ? (
+                  <motion.span 
+                    key="check"
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.5 }}
+                    className="flex items-center justify-center gap-2"
+                  >
+                    <Check size={16} strokeWidth={3} />
+                    Added to Basket
+                  </motion.span>
+                ) : (
+                  <motion.span 
+                    key="text"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-center justify-center gap-1.5"
+                  >
+                    Add to Basket
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+          )}
           
           <button 
             onClick={() => onTrace(props)}

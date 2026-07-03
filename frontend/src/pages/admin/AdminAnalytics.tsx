@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, BarChart3, PieChart, ArrowUpRight, DollarSign, ShoppingCart, Percent } from 'lucide-react';
+import { TrendingUp, BarChart3, PieChart, DollarSign, Percent } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const AdminAnalytics: React.FC = () => {

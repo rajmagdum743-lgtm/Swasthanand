@@ -28,6 +28,9 @@ public class ProductServiceTest {
     private ReactiveRedisTemplate<String, Object> redisTemplate;
 
     @Mock
+    private com.swasthanand.api.repository.ProductNotificationRepository notificationRepository;
+
+    @Mock
     private ReactiveValueOperations<String, Object> valueOperations;
 
     private ProductService productService;
@@ -35,7 +38,7 @@ public class ProductServiceTest {
 
     @BeforeEach
     public void setUp() {
-        productService = new ProductService(productRepository, redisTemplate);
+        productService = new ProductService(productRepository, notificationRepository, redisTemplate);
         sampleProduct = Product.builder()
                 .id("prod-123")
                 .name("Pure A2 Vedic Ghee")
@@ -81,6 +84,7 @@ public class ProductServiceTest {
 
     @Test
     public void testSaveProduct() {
+        when(productRepository.findById(anyString())).thenReturn(Mono.empty());
         when(productRepository.save(any(Product.class))).thenReturn(Mono.just(sampleProduct));
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.set(eq("product::prod-123"), any())).thenReturn(Mono.just(true));

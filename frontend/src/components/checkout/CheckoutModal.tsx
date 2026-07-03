@@ -10,7 +10,7 @@ interface CheckoutModalProps {
   onClose: () => void;
 }
 
-declare var Razorpay: any;
+declare let Razorpay: any;
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
   const { cart, clearCart } = useCart();
@@ -111,17 +111,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
           const verifyData = await verifyRes.json();
           if (verifyData.status === 'success') {
             // 4. Create actual order in database
-            await fetch(`${API_BASE_URL}/api/orders`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: user?.id,
-                user: { id: user?.id },
-                totalAmount: totalPrice,
-                status: 'PAID',
-                razorpayOrderId: response.razorpay_order_id
-              })
-            });
+              await fetch(`${API_BASE_URL}/api/orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: user?.id,
+                  user: { id: user?.id },
+                  totalAmount: totalPrice,
+                  status: 'PAID',
+                  razorpayOrderId: response.razorpay_order_id,
+                  items: cart.map(item => ({ productId: item.id, quantity: item.quantity, price: item.price }))
+                })
+              });
 
             clearCart();
             setIsLoading(false);
@@ -183,7 +184,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
             user: { id: user?.id },
             totalAmount: totalPrice,
             status: 'PENDING',
-            razorpayOrderId: 'COD_' + Date.now()
+            razorpayOrderId: 'COD_' + Date.now(),
+            items: cart.map(item => ({ productId: item.id, quantity: item.quantity, price: item.price }))
           };
 
           const response = await fetch(`${API_BASE_URL}/api/orders`, {

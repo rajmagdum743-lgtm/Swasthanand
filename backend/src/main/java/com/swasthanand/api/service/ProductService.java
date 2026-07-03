@@ -13,6 +13,7 @@ import reactor.core.publisher.Mono;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final com.swasthanand.api.repository.ProductNotificationRepository notificationRepository;
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
     private static final String CACHE_PREFIX = "product::";
 
@@ -52,12 +53,38 @@ public class ProductService {
 
     public Mono<Product> saveProduct(Product product) {
         product.serializeTags();
-        return productRepository.save(product)
+        return productRepository.findById(product.getId())
+                .flatMap(oldProduct -> {
+                    // Check if stock is replenished
+                    if (oldProduct.getStock() == 0 && product.getStock() > 0) {
+                        return notifySubscribers(product.getId()).then(Mono.just(product));
+                    }
+                    return Mono.just(product);
+                })
+                .defaultIfEmpty(product)
+                .flatMap(p -> productRepository.save(p))
                 .flatMap(savedProduct -> {
                     savedProduct.deserializeTags();
                     String key = CACHE_PREFIX + savedProduct.getId();
                     return redisTemplate.opsForValue().set(key, savedProduct)
                             .thenReturn(savedProduct);
+                });
+    }
+
+    private Mono<Void> notifySubscribers(String productId) {
+        return notificationRepository.findByProductIdAndNotifiedFalse(productId)
+                .flatMap(notification -> {
+                    System.out.println("NOTIFYING USER: " + notification.getContactInfo() + " for product " + productId);
+                    notification.setNotified(true);
+                    return notificationRepository.save(notification);
+                }).then();
+    }
+    
+    public Mono<Product> approveProduct(String id) {
+        return productRepository.findById(id)
+                .flatMap(product -> {
+                    product.setIsApproved(true);
+                    return saveProduct(product);
                 });
     }
 
