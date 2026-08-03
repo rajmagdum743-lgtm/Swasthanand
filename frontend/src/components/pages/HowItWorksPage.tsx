@@ -11,7 +11,10 @@ import {
   Leaf,
   CheckCircle2,
   TreeDeciduous,
-  History
+  History,
+  Sprout,
+  FileCheck,
+  Truck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -72,22 +75,22 @@ const HowItWorksPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative pt-40 pb-24 overflow-hidden bg-slate-50">
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
+      <section className="relative pt-28 md:pt-40 pb-16 md:pb-24 overflow-hidden bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
           <motion.div {...fadeIn} className="text-center max-w-3xl mx-auto">
-            <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-black uppercase tracking-widest mb-8">
+            <span className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-black uppercase tracking-widest mb-6 md:mb-8">
               The Swasthanand Quality Protocol
             </span>
-            <h1 className="text-5xl md:text-7xl font-black text-slate-900 leading-tight mb-8">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-black text-slate-900 leading-tight mb-4 md:mb-8">
               Transparency You Can <span className="gradient-text">Trust.</span>
             </h1>
-            <p className="text-xl text-slate-600 font-medium leading-relaxed mb-12">
+            <p className="text-sm sm:text-lg md:text-xl text-slate-600 font-medium leading-relaxed mb-8 md:mb-12">
               We started Swasthanand with a simple question: How can you be sure your food is truly pure? Our traceability system is the answer—a direct connection between you and the soil.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <button 
                 onClick={() => navigate('/traceability')}
-                className="btn-premium px-10 py-5 text-lg flex items-center gap-3"
+                className="btn-premium px-8 md:px-10 py-4 md:py-5 text-base md:text-lg flex items-center gap-3 w-full sm:w-auto justify-center"
               >
                 Try it Now <Search size={20} />
               </button>
@@ -96,83 +99,109 @@ const HowItWorksPage: React.FC = () => {
         </div>
 
         {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-1/3 h-full opacity-10 pointer-events-none">
+        <div className="absolute top-0 right-0 w-1/3 h-full opacity-10 pointer-events-none hidden sm:block">
            <TreeDeciduous size={600} className="text-emerald-900 translate-x-1/2 -translate-y-1/4" />
         </div>
       </section>
 
       {/* The Swasthanand Difference */}
-      <section className="py-32 px-6">
+      <section className="py-16 md:py-32 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
-           <div className="flex flex-col lg:flex-row gap-20 items-center">
+           <div className="flex flex-col lg:flex-row gap-10 md:gap-20 items-center">
               <motion.div 
                 {...fadeIn}
                 className="lg:w-1/2 space-y-8"
               >
-                <h2 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight">
-                  Beyond Certification: <br/> We Go to the Farm.
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-bold uppercase tracking-wider">
+                  <ShieldCheck size={16} /> Direct Verification
+                </div>
+                <h2 className="text-3xl md:text-5xl font-extrabold text-slate-900 leading-tight">
+                  Beyond Certification: Instant Real-time Soil & Lab Audit
                 </h2>
-                <p className="text-lg text-slate-500 font-medium leading-relaxed">
-                   Unlike standard organic labels that rely on annual paperwork, **Swasthanand experts visit every farming partner personally**. We test all parameters on-site to ensure that every single product meets the highest standards of purity before it reaches your table.
+                <p className="text-slate-600 font-medium text-lg leading-relaxed">
+                  Traditional organic logos often rely on annual audits. At Swasthanand, every harvest batch is audited independently before distribution.
                 </p>
-                <div className="space-y-4">
-                   {["Soil pH & Organic Carbon Check", "Pesticide-Free Verification", "Sustainable Water Usage Audit", "Real-time Growth Monitoring"].map((item, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                         <CheckCircle2 className="text-emerald-500" size={20} />
-                         <span className="font-black text-slate-700 uppercase tracking-wide text-sm">{item}</span>
-                      </div>
-                   ))}
+                <div className="space-y-4 pt-4">
+                  {[
+                    "Soil N-P-K nutrient breakdown attached to batch ID",
+                    "Harvest date, location pin, and farmer identity",
+                    "Pesticide-free laboratory test certificates"
+                  ].map((feat, idx) => (
+                    <div key={idx} className="flex items-center gap-3 text-slate-700 font-bold text-sm md:text-base">
+                      <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs shrink-0">✓</div>
+                      <span>{feat}</span>
+                    </div>
+                  ))}
                 </div>
               </motion.div>
-              <motion.div 
-                {...fadeIn}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="lg:w-1/2 grid grid-cols-1 md:grid-cols-2 gap-6"
-              >
-                 {commitmentPoints.map((point, i) => (
-                    <div key={i} className="p-8 bg-slate-50 rounded-[32px] border border-slate-100 hover:border-emerald-200 hover:bg-white transition-all group">
-                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-600 mb-6 shadow-sm group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                          <point.icon size={24} />
-                       </div>
-                       <h3 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-tight">{point.title}</h3>
-                       <p className="text-sm text-slate-500 font-medium leading-relaxed">{point.desc}</p>
+              <motion.div {...fadeIn} className="lg:w-1/2 w-full">
+                <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
+                  <img 
+                    src="https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&q=80&w=1200" 
+                    alt="Organic Farming Soil Test" 
+                    className="w-full h-[320px] md:h-[480px] object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent flex items-end p-6 md:p-8 text-white">
+                    <div>
+                      <p className="text-emerald-400 font-mono text-xs font-bold uppercase tracking-widest mb-1">Field Visit Record</p>
+                      <h3 className="text-xl md:text-2xl font-black">Soil Nutrient & Moisture Logged Live</h3>
                     </div>
-                 ))}
+                  </div>
+                </div>
               </motion.div>
            </div>
         </div>
       </section>
 
-      {/* Process Steps */}
-      <section className="py-32 px-6 bg-slate-900 text-white rounded-[60px] mx-4 mb-32 overflow-hidden relative">
-        <div className="absolute top-0 right-0 p-20 opacity-10 pointer-events-none">
-           <Leaf size={400} className="rotate-45" />
-        </div>
-        
+      {/* The 4 Step Protocol */}
+      <section className="bg-slate-900 text-white py-16 md:py-32 px-4 sm:px-6 relative overflow-hidden">
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center max-w-2xl mx-auto mb-24">
-            <h2 className="text-4xl md:text-6xl font-black mb-6">How to Trace Your Product</h2>
-            <p className="text-slate-400 text-lg font-medium">It only takes a few seconds to verify the purity of your purchase.</p>
+          <div className="text-center max-w-2xl mx-auto mb-12 md:mb-20 space-y-4">
+            <span className="inline-block px-4 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-black uppercase tracking-widest border border-emerald-500/30">
+              End-to-End Pipeline
+            </span>
+            <h2 className="text-3xl md:text-5xl font-black tracking-tight">From Soil to Doorstep</h2>
+            <p className="text-slate-400 font-medium text-sm md:text-base">How Swasthanand ensures complete authenticity at every stage of production.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            {steps.map((step, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+            {[
+              {
+                icon: Sprout,
+                step: "Step 01",
+                title: "Organic Sourcing",
+                desc: "Harvested naturally without synthetic pesticides or harmful chemical fertilizers."
+              },
+              {
+                icon: FileCheck,
+                step: "Step 02",
+                title: "Lab Testing",
+                desc: "Soil parameters, moisture levels, and purity certificates uploaded directly to the platform."
+              },
+              {
+                icon: ShieldCheck,
+                step: "Step 03",
+                title: "Batch Sealing",
+                desc: "Unique QR Batch IDs issued for each lot ensuring tamper-proof tracking."
+              },
+              {
+                icon: Truck,
+                step: "Step 04",
+                title: "Doorstep Delivery",
+                desc: "Direct delivery from verified local warehouses to maintain fresh quality."
+              }
+            ].map((st, i) => (
               <motion.div 
                 key={i} 
-                {...fadeIn}
-                transition={{ delay: i * 0.1 }}
-                className="relative"
+                {...fadeIn} 
+                className="bg-slate-800/80 border border-slate-700 p-6 md:p-8 rounded-3xl space-y-4 hover:border-emerald-500/50 transition-all"
               >
-                <div className={`w-16 h-16 ${step.color} rounded-2xl flex items-center justify-center mb-8 shadow-xl`}>
-                  <step.icon size={32} />
+                <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center">
+                  <st.icon size={24} />
                 </div>
-                <h3 className="text-2xl font-black mb-4">{step.title}</h3>
-                <p className="text-slate-400 font-medium leading-relaxed">{step.desc}</p>
-                {i < 2 && (
-                  <div className="hidden lg:block absolute top-8 -right-6 text-slate-700">
-                    <ArrowRight size={32} />
-                  </div>
-                )}
+                <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest">{st.step}</span>
+                <h3 className="text-lg md:text-xl font-extrabold text-white">{st.title}</h3>
+                <p className="text-slate-400 text-xs md:text-sm font-medium leading-relaxed">{st.desc}</p>
               </motion.div>
             ))}
           </div>
@@ -180,18 +209,18 @@ const HowItWorksPage: React.FC = () => {
       </section>
 
       {/* Call to Action */}
-      <section className="pb-40 px-6">
-        <div className="max-w-4xl mx-auto bg-emerald-50 content-glow rounded-[48px] p-12 md:p-20 text-center border-2 border-emerald-100">
+      <section className="pb-24 md:pb-40 px-4 sm:px-6 pt-16 md:pt-24">
+        <div className="max-w-4xl mx-auto bg-emerald-50 content-glow rounded-[28px] sm:rounded-[48px] p-6 sm:p-12 md:p-20 text-center border-2 border-emerald-100">
           <motion.div {...fadeIn}>
-            <Leaf className="mx-auto text-emerald-600 mb-8" size={60} />
-            <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-6">Ready to Trace the Origin?</h2>
-            <p className="text-xl text-slate-600 font-medium mb-12 max-w-2xl mx-auto leading-relaxed">
+            <Leaf className="mx-auto text-emerald-600 mb-6 md:mb-8" size={48} />
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 mb-4 md:mb-6">Ready to Trace the Origin?</h2>
+            <p className="text-sm sm:text-lg md:text-xl text-slate-600 font-medium mb-8 md:mb-12 max-w-2xl mx-auto leading-relaxed">
               Join thousands of conscious consumers who choose health without compromise. Start your journey into purity today.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <button 
                  onClick={() => navigate('/')}
-                 className="btn-premium px-12 py-5 text-lg"
+                 className="btn-premium px-8 sm:px-12 py-4 sm:py-5 text-base sm:text-lg w-full sm:w-auto justify-center"
               >
                 Go to Marketplace
               </button>

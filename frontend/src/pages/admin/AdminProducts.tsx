@@ -304,7 +304,7 @@ const AdminProducts: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white rounded-3xl shadow-2xl z-[151] overflow-hidden max-h-[90vh] flex flex-col"
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-2xl bg-white rounded-3xl shadow-2xl z-[151] overflow-hidden max-h-[90vh] flex flex-col"
             >
               {/* Header */}
               <div className="px-6 py-5 bg-slate-900 text-white flex justify-between items-center">

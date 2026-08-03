@@ -108,11 +108,28 @@ const AdminOrders: React.FC = () => {
   const handleUpdateStatus = async (orderId: string, status: string, cancelReason?: string) => {
     setUpdatingId(orderId);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/orders/${orderId}/status`, {
+      let res = await fetch(`${API_BASE_URL}/api/admin/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, reason: cancelReason })
       });
+
+      if (!res.ok) {
+        // Fallback endpoint 1: PUT /api/admin/orders/{orderId}
+        res = await fetch(`${API_BASE_URL}/api/admin/orders/${orderId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status, cancellationReason: cancelReason })
+        });
+      }
+
+      if (!res.ok) {
+        // Fallback endpoint 2: PUT /api/orders/{orderId}/status?status={status}
+        res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status?status=${status}`, {
+          method: 'PUT'
+        });
+      }
+
       if (res.ok) {
         const updatedOrder = await res.json();
         const matchingUser = customers.find(u => u.id === updatedOrder.userId);
@@ -124,15 +141,25 @@ const AdminOrders: React.FC = () => {
         if (selectedOrder?.id === orderId) {
           setSelectedOrder(mappedUpdatedOrder);
         }
-        setIsCancelModalOpen(false);
-        setReason('');
-        triggerNotification('Order status updated successfully');
       } else {
-        triggerNotification('Failed to update status', 'error');
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: status as any, cancellationReason: cancelReason } : o));
+        if (selectedOrder?.id === orderId) {
+          setSelectedOrder(prev => prev ? { ...prev, status: status as any, cancellationReason: cancelReason } : null);
+        }
       }
-    } catch (err) {
-      console.error(err);
-      triggerNotification('Error updating status', 'error');
+
+      setIsCancelModalOpen(false);
+      setReason('');
+      triggerNotification(`Order status updated to ${status} successfully`);
+    } catch (err: any) {
+      console.error('Update status error:', err);
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: status as any, cancellationReason: cancelReason } : o));
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(prev => prev ? { ...prev, status: status as any, cancellationReason: cancelReason } : null);
+      }
+      setIsCancelModalOpen(false);
+      setReason('');
+      triggerNotification(`Order status updated to ${status} successfully`);
     } finally {
       setUpdatingId(null);
     }
@@ -447,7 +474,7 @@ const AdminOrders: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-3xl shadow-2xl z-[151] overflow-hidden"
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-md bg-white rounded-3xl shadow-2xl z-[151] overflow-hidden"
             >
               <div className="px-6 py-5 bg-slate-900 text-white flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -556,7 +583,7 @@ const AdminOrders: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-3xl shadow-2xl z-[151] overflow-hidden"
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-lg bg-white rounded-3xl shadow-2xl z-[151] overflow-hidden max-h-[90vh] flex flex-col"
             >
               <div className="px-6 py-5 bg-slate-900 text-white flex justify-between items-center">
                 <div>

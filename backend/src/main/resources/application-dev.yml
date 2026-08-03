@@ -3,18 +3,23 @@ spring:
     activate:
       on-profile: dev
   r2dbc:
-    url: r2dbc:mssql://localhost:1433/swasthanand?trustServerCertificate=true
-    username: sa
-    password: 123
-
+    url: ${SPRING_R2DBC_URL:r2dbc:h2:mem:///swasthanand;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
+    username: ${SPRING_R2DBC_USERNAME:sa}
+    password: ${SPRING_R2DBC_PASSWORD:}
+  redis:
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
 
 app:
-  admin-debug-otp: true
   payment:
     razorpay:
       enabled: true
 
+logging:
+  level:
+    com.swasthanand.api: DEBUG
+
 razorpay:
   key:
-    id: rzp_test_placeholder_id
-    secret: placeholder_secret
+    id: ${RAZORPAY_KEY_ID:rzp_test_placeholder_id}
+    secret: ${RAZORPAY_KEY_SECRET:placeholder_secret}

@@ -6,7 +6,7 @@ interface AccountDropdownProps {
   onOpenLogin: () => void;
   onOpenRegister: () => void;
   onOpenDealerLogin: () => void;
-  onOpenAdminLogin: () => void;
+  onOpenAdminLogin?: () => void;
   buttonText?: string;
 }
 
@@ -89,15 +89,6 @@ export const AccountDropdown: React.FC<AccountDropdownProps> = ({
         onOpenDealerLogin();
       },
       hoverBg: 'hover:bg-amber-50 hover:text-amber-800'
-    },
-    {
-      label: 'Admin Login',
-      icon: <ShieldAlert size={16} className="text-teal-600 group-hover:scale-110 transition-transform" />,
-      onClick: () => {
-        setIsOpen(false);
-        onOpenAdminLogin();
-      },
-      hoverBg: 'hover:bg-teal-50 hover:text-teal-800'
     }
   ];
 

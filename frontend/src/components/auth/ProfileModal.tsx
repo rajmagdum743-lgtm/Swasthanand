@@ -133,14 +133,21 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialTab
     const order = selectedInvoiceOrder;
     const dateStr = new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     const timeStr = new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    const isCod = order.razorpayOrderId && order.razorpayOrderId.startsWith('COD_');
+    const isCod = !order.razorpayOrderId || 
+                  order.razorpayOrderId.toUpperCase().startsWith('COD') || 
+                  order.razorpayOrderId.toUpperCase().includes('COD') || 
+                  order.status === 'PENDING';
     const paymentMethodText = isCod ? 'Cash on Delivery (COD)' : 'Online Card/UPI';
     
-    const refHtml = order.razorpayOrderId ? `
+    const refHtml = isCod ? `
+        <div class="meta-row">
+          <span>Payment Status:</span>
+          <strong style="color: #d97706; font-weight: 800;">Pay on Delivery (COD)</strong>
+        </div>` : (order.razorpayOrderId ? `
         <div class="meta-row">
           <span>Transaction Ref:</span>
           <strong style="color: #334155; font-family: monospace;">${order.razorpayOrderId}</strong>
-        </div>` : '';
+        </div>` : '');
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -397,61 +404,61 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialTab
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={onClose} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300]" />
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white rounded-[32px] shadow-2xl z-[301] overflow-hidden"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-2xl bg-white rounded-[28px] sm:rounded-[32px] shadow-2xl z-[301] overflow-hidden"
           >
-            <div className="flex flex-col h-[80vh]">
+            <div className="flex flex-col h-[85vh] sm:h-[80vh]">
               {/* Header */}
-              <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white">
-                    <UserIcon size={24} />
+              <div className="p-4 sm:p-8 border-b flex justify-between items-center bg-slate-50/50 shrink-0">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shrink-0">
+                    <UserIcon size={20} className="sm:w-[24px] sm:h-[24px]" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Your Profile</h2>
-                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">{user.phone}</p>
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Your Profile</h2>
+                    <p className="text-slate-400 text-xs sm:text-sm font-bold uppercase tracking-widest">+91 {user.phone}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   {(user.role === 'ADMIN' || user.phone === '9284939947') && (
                     <button 
                       onClick={() => {
                         onClose();
                         navigate('/admin');
                       }}
-                      className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-200"
+                      className="flex items-center gap-1.5 sm:gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl transition-all shadow-lg shadow-emerald-200"
                     >
-                      <ShieldCheck size={18} />
-                      <span className="text-xs font-black uppercase tracking-widest">Admin</span>
+                      <ShieldCheck size={16} />
+                      <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest">Admin</span>
                     </button>
                   )}
-                  <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                    <X size={24} />
+                  <button onClick={onClose} className="p-1.5 sm:p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400 hover:text-slate-600">
+                    <X size={20} className="sm:w-[24px] sm:h-[24px]" />
                   </button>
                 </div>
               </div>
 
               {/* Tabs */}
-              <div className="flex px-8 border-b">
-                <button onClick={() => setActiveTab('info')} className={`py-4 px-6 text-sm font-bold transition-all relative ${activeTab === 'info' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
+              <div className="flex overflow-x-auto scrollbar-none px-2 sm:px-8 border-b shrink-0 whitespace-nowrap">
+                <button onClick={() => setActiveTab('info')} className={`py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-bold transition-all relative shrink-0 ${activeTab === 'info' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
                   Basic Info
                   {activeTab === 'info' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500" />}
                 </button>
-                <button onClick={() => setActiveTab('addresses')} className={`py-4 px-6 text-sm font-bold transition-all relative ${activeTab === 'addresses' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                <button onClick={() => setActiveTab('addresses')} className={`py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-bold transition-all relative shrink-0 ${activeTab === 'addresses' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
                   Manage Addresses
                   {activeTab === 'addresses' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500" />}
                 </button>
-                <button onClick={() => setActiveTab('cart')} className={`py-4 px-6 text-sm font-bold transition-all relative ${activeTab === 'cart' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                <button onClick={() => setActiveTab('cart')} className={`py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-bold transition-all relative shrink-0 ${activeTab === 'cart' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
                   My Cart
                   {activeTab === 'cart' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500" />}
                 </button>
-                <button onClick={() => setActiveTab('orders')} className={`py-4 px-6 text-sm font-bold transition-all relative ${activeTab === 'orders' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                <button onClick={() => setActiveTab('orders')} className={`py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-bold transition-all relative shrink-0 ${activeTab === 'orders' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
                   My Orders
                   {activeTab === 'orders' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 w-full h-1 bg-emerald-500" />}
                 </button>
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto p-8">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-8">
                 {activeTab === 'info' ? (
                   <div className="max-w-md space-y-6">
                     <div className="space-y-2">
@@ -712,18 +719,35 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialTab
 
                 {/* Meta details */}
                 <div className="p-4 bg-slate-50 rounded-2xl text-xs space-y-1 font-semibold text-slate-500">
-                  <div className="flex justify-between">
-                    <span>Payment Method:</span>
-                    <span className="font-bold text-slate-800">
-                      {selectedInvoiceOrder.razorpayOrderId && selectedInvoiceOrder.razorpayOrderId.startsWith('COD_') ? 'Cash on Delivery (COD)' : 'Online Card/UPI'}
-                    </span>
-                  </div>
-                  {selectedInvoiceOrder.razorpayOrderId && (
-                    <div className="flex justify-between">
-                      <span>Transaction Ref:</span>
-                      <span className="font-mono font-bold text-slate-700">{selectedInvoiceOrder.razorpayOrderId}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const isCod = !selectedInvoiceOrder.razorpayOrderId || 
+                                  selectedInvoiceOrder.razorpayOrderId.toUpperCase().startsWith('COD') || 
+                                  selectedInvoiceOrder.razorpayOrderId.toUpperCase().includes('COD') || 
+                                  selectedInvoiceOrder.status === 'PENDING';
+                    return (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Payment Method:</span>
+                          <span className="font-bold text-slate-800">
+                            {isCod ? 'Cash on Delivery (COD)' : 'Online Card/UPI'}
+                          </span>
+                        </div>
+                        {isCod ? (
+                          <div className="flex justify-between">
+                            <span>Payment Status:</span>
+                            <span className="font-mono font-bold text-amber-600">Pay on Delivery</span>
+                          </div>
+                        ) : (
+                          selectedInvoiceOrder.razorpayOrderId && (
+                            <div className="flex justify-between">
+                              <span>Transaction Ref:</span>
+                              <span className="font-mono font-bold text-slate-700">{selectedInvoiceOrder.razorpayOrderId}</span>
+                            </div>
+                          )
+                        )}
+                      </>
+                    );
+                  })()}
                   {selectedInvoiceOrder.dealershipNodeId && (
                     <div className="flex justify-between">
                       <span>Distribution Node:</span>

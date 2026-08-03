@@ -65,6 +65,11 @@ public class Product implements Persistable<String> {
     
     // Traceability & Origin specific fields
     private String harvestDate;
+    private String mfgDate;
+    private String processingDetails;
+    private String storageDetails;
+    private String transportDetails;
+    private String qualityInfo;
     private String weatherTemp;
     private String growthQuality;
     private String organicMatter;
@@ -75,11 +80,13 @@ public class Product implements Persistable<String> {
     // Phase 1 SRS lifecycle and inventory fields
     private LifecycleState status;
     private String dealershipNodeId;
+    private String dealerId;
     private LocalDate expiryDate;
 
     public enum LifecycleState {
-        QC_PASSED, DEALER_ALLOCATED, SOLD, EXPIRED
+        MANUFACTURED, QC_PENDING, QC_PASSED, WAREHOUSE, DEALER_ALLOCATED, IN_TRANSIT, DELIVERED, SOLD, RETURNED, EXPIRED, DESTROYED
     }
+
 
     @Transient
     private static final com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();

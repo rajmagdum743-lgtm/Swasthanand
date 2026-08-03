@@ -38,6 +38,12 @@ public class DatabaseConfig implements AfterConvertCallback<Object>, AfterSaveCa
             ((FarmBatch) entity).setNew(false);
         } else if (entity instanceof DealershipNode) {
             ((DealershipNode) entity).setNew(false);
+        } else if (entity instanceof com.swasthanand.api.model.Batch) {
+            ((com.swasthanand.api.model.Batch) entity).setNew(false);
+        } else if (entity instanceof com.swasthanand.api.model.InventoryHistory) {
+            ((com.swasthanand.api.model.InventoryHistory) entity).setNew(false);
+        } else if (entity instanceof com.swasthanand.api.model.AuditLog) {
+            ((com.swasthanand.api.model.AuditLog) entity).setNew(false);
         }
     }
 }

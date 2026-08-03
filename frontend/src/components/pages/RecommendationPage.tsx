@@ -211,28 +211,28 @@ const RecommendationPage: React.FC = () => {
   const doshaPercentages = calculateDoshas();
 
   return (
-    <div className="pt-32 pb-40 px-6 min-h-screen bg-slate-50 selection:bg-emerald-100 selection:text-emerald-900">
+    <div className="pt-28 md:pt-32 pb-24 md:pb-40 px-4 sm:px-6 min-h-screen bg-slate-50 selection:bg-emerald-100 selection:text-emerald-900">
       <div className="max-w-4xl mx-auto">
 
         {/* Header Section */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-10 md:mb-16">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-extrabold tracking-widest uppercase mb-6 shadow-sm border border-emerald-200/50"
+            className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-extrabold tracking-widest uppercase mb-4 md:mb-6 shadow-sm border border-emerald-200/50"
           >
             Personalized Ayurvedic Guide
           </motion.div>
-          <h1 className="text-5xl font-black text-slate-900 mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 mb-4 md:mb-6">
             Discover Your <span className="gradient-text">Path to Balance</span>
           </h1>
-          <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base md:text-lg text-slate-500 font-medium max-w-2xl mx-auto">
             Our expert recommendation engine combines ancient Ayurvedic wisdom with your unique health profile to suggest the purest natural solutions.
           </p>
         </div>
 
         {/* Form Container */}
-        <div className="glass-morphism p-8 md:p-12 rounded-[2.5rem] border border-white/60 shadow-2xl relative overflow-hidden">
+        <div className="glass-morphism p-5 sm:p-8 md:p-12 rounded-[2rem] sm:rounded-[2.5rem] border border-white/60 shadow-2xl relative overflow-hidden">
 
           <AnimatePresence mode="wait">
             {step === 1 && (
@@ -600,9 +600,9 @@ const RecommendationPage: React.FC = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: idx * 0.1 }}
-                        className="group bg-white p-2 pr-8 rounded-[2.5rem] border border-slate-100 hover:border-emerald-200 shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row gap-8 items-center"
+                        className="group bg-white p-4 md:p-2 md:pr-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 hover:border-emerald-200 shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row gap-6 md:gap-8 items-center"
                       >
-                        <div className="w-full md:w-64 h-64 bg-slate-50 rounded-[2rem] overflow-hidden shrink-0">
+                        <div className="w-full md:w-64 h-48 md:h-64 bg-slate-50 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shrink-0">
                           <img
                             src={prod.image}
                             alt={prod.name}
@@ -612,9 +612,9 @@ const RecommendationPage: React.FC = () => {
                             }}
                           />
                         </div>
-                        <div className="flex-1 py-4">
-                          <div className="flex flex-wrap items-center gap-3 mb-4">
-                            <h4 className="text-2xl font-black text-slate-900">{prod.name}</h4>
+                        <div className="flex-1 py-2 md:py-4">
+                          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-3 md:mb-4">
+                            <h4 className="text-xl md:text-2xl font-black text-slate-900">{prod.name}</h4>
                             <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-black uppercase tracking-tighter border border-emerald-100">
                               Top Suggestion
                             </span>

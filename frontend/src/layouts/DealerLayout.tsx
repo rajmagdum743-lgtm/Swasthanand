@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, Outlet, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -28,10 +29,40 @@ const DealerLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [selectedWarehouse, setSelectedWarehouse] = useState('Satara Agri-Coop Center');
-  const [nodeId, setNodeId] = useState('satara-coop-node-id');
+  const [selectedWarehouse, setSelectedWarehouse] = useState('Supplier Warehouse');
+  const [nodeId, setNodeId] = useState('');
   const [warehouseDropOpen, setWarehouseDropOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const [notifPos, setNotifPos] = useState({ top: 0, right: 0 });
+
+  const updateNotifPos = () => {
+    if (bellRef.current) {
+      const rect = bellRef.current.getBoundingClientRect();
+      setNotifPos({
+        top: rect.bottom + 8,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    }
+  };
+
+  const openNotif = () => {
+    if (!notifOpen) {
+      updateNotifPos();
+    }
+    setNotifOpen(prev => !prev);
+  };
+
+  useEffect(() => {
+    if (notifOpen) {
+      window.addEventListener('resize', updateNotifPos);
+      window.addEventListener('scroll', updateNotifPos, true);
+      return () => {
+        window.removeEventListener('resize', updateNotifPos);
+        window.removeEventListener('scroll', updateNotifPos, true);
+      };
+    }
+  }, [notifOpen]);
 
   // Light/Dark mode state
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -50,21 +81,64 @@ const DealerLayout: React.FC = () => {
 
   // Fetch dealer node from backend
   useEffect(() => {
-    if (user?.id && !user.id.startsWith('mock-')) {
-      fetch(`${API_BASE_URL}/api/products/node/dealer/${user.id}`)
+    if (user?.id) {
+      const token = localStorage.getItem('swasthanand_token');
+      fetch(`${API_BASE_URL}/api/dealer/profile`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
         .then(res => {
           if (res.ok) return res.json();
           throw new Error('Not found');
         })
-        .then(node => {
-          if (node && node.id) {
-            setNodeId(node.id);
-            setSelectedWarehouse(node.name);
+        .then(profile => {
+          if (profile && profile.dealershipNode) {
+            setNodeId(profile.dealershipNode.id);
+            setSelectedWarehouse(profile.dealershipNode.name);
+          } else if (user.id) {
+            setNodeId(`node-dealer-${user.id}`);
+            setSelectedWarehouse(`${user.name || 'Supplier'} Warehouse`);
           }
         })
         .catch(err => {
-          console.warn('Could not load dealer node from backend, using defaults:', err);
+          console.warn('Could not load dealer node profile:', err);
+          if (user?.id) {
+            setNodeId(`node-dealer-${user.id}`);
+            setSelectedWarehouse(`${user.name || 'Supplier'} Warehouse`);
+          }
         });
+    }
+  }, [user]);
+
+  const [productsCount, setProductsCount] = useState<number | null>(null);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState<number | null>(null);
+  const [unreadAlertsCount, setUnreadAlertsCount] = useState<number | null>(null);
+
+  // Fetch real counts for navigation badges
+  useEffect(() => {
+    if (user?.id) {
+      const token = localStorage.getItem('swasthanand_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      fetch(`${API_BASE_URL}/api/dealer/inventory`, { headers })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setProductsCount(data.length > 0 ? data.length : null))
+        .catch(() => setProductsCount(null));
+
+      fetch(`${API_BASE_URL}/api/dealer/orders`, { headers })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          const pending = data.filter((o: any) => o.status === 'PENDING').length;
+          setPendingOrdersCount(pending > 0 ? pending : null);
+        })
+        .catch(() => setPendingOrdersCount(null));
+
+      fetch(`${API_BASE_URL}/api/dealer/alerts`, { headers })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          const unread = data.filter((a: any) => !a.isRead).length;
+          setUnreadAlertsCount(unread > 0 ? unread : null);
+        })
+        .catch(() => setUnreadAlertsCount(null));
     }
   }, [user]);
 
@@ -77,29 +151,19 @@ const DealerLayout: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
-  const warehouses = [
-    'Satara Agri-Coop Center',
-    'Pune Hub & Cold Storage',
-    'Mumbai B2B Distribution Point',
-    'Sangli Farmers Union Warehouse'
-  ];
-
   const menuItems = [
     { path: '/dealer/dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: null, desc: 'Overview' },
-    { path: '/dealer/inventory', label: 'My Catalog', icon: PackageCheck, badge: '3', desc: 'Manage Stock' },
-    { path: '/dealer/orders', label: 'B2B Procurement', icon: TrendingUp, badge: '2', desc: 'Purchase Requests' },
+    { path: '/dealer/inventory', label: 'My Catalog', icon: PackageCheck, badge: productsCount ? String(productsCount) : null, desc: 'Manage Stock' },
+    { path: '/dealer/orders', label: 'B2B Procurement', icon: TrendingUp, badge: pendingOrdersCount ? String(pendingOrdersCount) : null, desc: 'Purchase Requests' },
     { path: '/dealer/traceability', label: 'Batch Traceability', icon: Search, badge: null, desc: 'Farm to Depot' },
-    { path: '/dealer/lifecycle', label: 'Lifecycle Status', icon: Activity, badge: null, desc: 'Quality Stages' },
-    { path: '/dealer/reports', label: 'Supply Reports', icon: ClipboardList, badge: null, desc: 'Sales & Stock Logs' },
-    { path: '/dealer/notifications', label: 'Admin Alerts', icon: Bell, badge: '4', desc: 'Messages' },
+    { path: '/dealer/notifications', label: 'Admin Alerts', icon: Bell, badge: unreadAlertsCount ? String(unreadAlertsCount) : null, desc: 'Messages' },
     { path: '/dealer/profile', label: 'Supplier Profile', icon: UserIcon, badge: null, desc: 'Node Settings' }
   ];
 
-  const notifications = [
-    { title: 'New Order Received', desc: 'Order #ORD-8492 is pending approval', time: '2m ago', color: 'bg-amber-500' },
-    { title: 'Low Stock Alert', desc: 'Moringa Powder is below 15 units', time: '15m ago', color: 'bg-rose-500' },
-    { title: 'Product Expiring Soon', desc: 'Organic Honey HT-402 expires in 10 days', time: '1h ago', color: 'bg-amber-500' },
-    { title: 'Shipment Dispatched', desc: 'Order #ORD-7391 has been sent to hub', time: '3h ago', color: 'bg-emerald-500' }
+  const notifications: { title: string; desc: string; time: string; color: string }[] = [
+    { title: 'Stock Replenishment Approved', desc: 'Satara node order #ORD-4029 confirmed', time: '10 mins ago', color: 'bg-emerald-500' },
+    { title: 'Low Inventory Notice', desc: 'Organic Turmeric powder below safety threshold', time: '1 hour ago', color: 'bg-amber-500' },
+    { title: 'New Dispatch Scheduled', desc: 'Vehicle MH-12-VT-9021 in transit', time: '3 hours ago', color: 'bg-blue-500' }
   ];
 
   const handleLogout = () => {
@@ -431,59 +495,6 @@ const DealerLayout: React.FC = () => {
               <MapPin size={12} className="text-emerald-500 shrink-0" />
               <span className="text-slate-400 hidden lg:inline">Active Site:</span>
               <span className="font-extrabold">{selectedWarehouse}</span>
-            </div>
-
-            {/* Notifications Alert Dropdown */}
-            <div className="relative">
-              <button 
-                onClick={() => setNotifOpen(!notifOpen)}
-                className={`relative w-9 h-9 flex items-center justify-center rounded-xl border transition-all ${
-                  isDarkMode 
-                    ? 'border-white/8 text-slate-400 hover:text-white hover:border-emerald-500/30 bg-white/5' 
-                    : 'border-slate-200 text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100'
-                }`}
-              >
-                <Bell size={15} />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
-              </button>
-              <AnimatePresence>
-                {notifOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
-                    <motion.div 
-                      initial={{ opacity: 0, y: 8, scale: 0.95 }} 
-                      animate={{ opacity: 1, y: 0, scale: 1 }} 
-                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                      className={`absolute top-full right-0 mt-2 w-72 rounded-2xl border shadow-2xl z-50 overflow-hidden ${
-                        isDarkMode ? 'border-white/10 bg-[#0b140f] backdrop-blur-xl' : 'border-slate-200 bg-white'
-                      }`}
-                    >
-                      <div className={`p-4 border-b flex justify-between items-center ${isDarkMode ? 'border-white/5' : 'border-slate-100'}`}>
-                        <span className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Recent Alerts</span>
-                        <Link 
-                          to="/dealer/notifications" 
-                          onClick={() => setNotifOpen(false)}
-                          className="text-[9px] font-black text-emerald-500 uppercase hover:underline"
-                        >
-                          View All
-                        </Link>
-                      </div>
-                      <div className="divide-y divide-slate-100 dark:divide-white/3 max-h-80 overflow-y-auto custom-scrollbar">
-                        {notifications.map((n, i) => (
-                          <div key={i} className="flex items-start gap-3 p-4 hover:bg-slate-50 dark:hover:bg-white/3 transition-colors">
-                            <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${n.color}`} />
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-xs font-extrabold ${isDarkMode ? 'text-white' : 'text-slate-800'} truncate`}>{n.title}</p>
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{n.desc}</p>
-                              <p className="text-[8px] text-slate-400 dark:text-slate-500 font-bold mt-1">{n.time}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
             </div>
           </div>
         </header>

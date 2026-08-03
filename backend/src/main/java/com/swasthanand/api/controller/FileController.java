@@ -8,10 +8,14 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
+
+    @org.springframework.beans.factory.annotation.Value("${server.port:8081}")
+    private String serverPort;
 
     private final Path root = Paths.get("uploads");
 
@@ -28,7 +32,8 @@ public class FileController {
     @PostMapping("/upload")
     public Mono<ResponseEntity<Object>> uploadFile(
             @RequestPart("file") FilePart filePart,
-            @RequestParam("productName") String productName) {
+            @RequestParam(value = "productName", required = false) String productName,
+            @RequestParam(value = "prefix", required = false) String prefix) {
         
         String originalFilename = StringUtils.cleanPath(filePart.filename());
         if (originalFilename.isEmpty()) {
@@ -38,19 +43,28 @@ public class FileController {
         String extension = "";
         int i = originalFilename.lastIndexOf('.');
         if (i > 0) {
-            extension = originalFilename.substring(i + 1);
+            extension = originalFilename.substring(i + 1).toLowerCase();
         }
         if (extension.isEmpty()) extension = "pdf";
 
-        // Sanitize product name: replace non-alphanumeric with underscores
-        String sanitizedName = productName.replaceAll("[^a-zA-Z0-9]", "_");
-        String filename = sanitizedName + "_Swasthanand." + extension;
-        Path targetPath = this.root.resolve(filename);
+        String baseName = "doc";
+        if (productName != null && !productName.isBlank()) {
+            baseName = productName.replaceAll("[^a-zA-Z0-9]", "_");
+        } else if (prefix != null && !prefix.isBlank()) {
+            baseName = prefix.replaceAll("[^a-zA-Z0-9]", "_");
+        }
+
+        String uniqueFilename = baseName + "_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 6) + "." + extension;
+        Path targetPath = this.root.resolve(uniqueFilename);
 
         return filePart.transferTo(targetPath)
                 .then(Mono.fromCallable(() -> {
-                    String fileUrl = "http://localhost:8080/api/files/" + filename;
-                    return ResponseEntity.ok((Object) Map.of("url", fileUrl, "filename", filename));
+                    String fileUrl = "http://localhost:" + serverPort + "/api/files/" + uniqueFilename;
+                    return ResponseEntity.ok((Object) Map.of(
+                            "url", fileUrl,
+                            "filename", uniqueFilename,
+                            "originalFilename", originalFilename
+                    ));
                 }))
                 .onErrorResume(e -> Mono.just(ResponseEntity.internalServerError().body((Object) Map.of("message", "Could not upload the file: " + e.getMessage()))));
     }

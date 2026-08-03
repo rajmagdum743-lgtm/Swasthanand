@@ -2,6 +2,13 @@ spring:
   config:
     activate:
       on-profile: prod
+  r2dbc:
+    url: ${SPRING_R2DBC_URL}
+    username: ${SPRING_R2DBC_USERNAME}
+    password: ${SPRING_R2DBC_PASSWORD}
+  redis:
+    host: ${SPRING_REDIS_HOST}
+    port: ${SPRING_REDIS_PORT:6379}
 
 app:
   admin-debug-otp: false
@@ -9,8 +16,11 @@ app:
     razorpay:
       enabled: false
 
-# Razorpay keys are not needed in prod if disabled, or use placeholders for live keys
+logging:
+  level:
+    com.swasthanand.api: INFO
+
 razorpay:
   key:
-    id: rzp_live_placeholders
-    secret: live_placeholder_secret
+    id: ${RAZORPAY_KEY_ID:rzp_live_placeholders}
+    secret: ${RAZORPAY_KEY_SECRET:live_placeholder_secret}

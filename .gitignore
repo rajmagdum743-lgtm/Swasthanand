@@ -54,3 +54,8 @@ frontend/android/build/
 # Temporary files
 /tmp/
 !/.gitkeep
+
+# Local databases and logs
+pg_data/
+pg_log.txt
+backend/.env

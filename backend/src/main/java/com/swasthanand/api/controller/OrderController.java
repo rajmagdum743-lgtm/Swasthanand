@@ -43,8 +43,15 @@ public class OrderController {
     }
 
     @PostMapping
-    public Mono<Order> createOrder(@RequestBody Order order) {
-        return orderService.createOrder(order);
+    public Mono<ResponseEntity<Object>> createOrder(@RequestBody Order order) {
+        return orderService.createOrder(order)
+                .map(saved -> ResponseEntity.ok((Object) saved))
+                .onErrorResume(IllegalArgumentException.class, ex -> 
+                    Mono.just(ResponseEntity.badRequest().body((Object) java.util.Map.of(
+                        "success", false,
+                        "message", ex.getMessage()
+                    )))
+                );
     }
 
     @GetMapping("/user/{userId}")
@@ -62,9 +69,7 @@ public class OrderController {
             @PathVariable String id, 
             @RequestParam Order.OrderStatus status,
             Principal principal) {
-        return orderService.getAllOrders()
-                .filter(o -> o.getId().equals(id))
-                .next()
+        return orderService.getOrderById(id)
                 .flatMap(order -> hasAccessToNode(order.getDealershipNodeId(), principal)
                         .flatMap(hasAccess -> {
                             if (!hasAccess) {

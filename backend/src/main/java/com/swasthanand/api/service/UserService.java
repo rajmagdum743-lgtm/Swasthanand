@@ -62,6 +62,7 @@ public class UserService {
     }
 
     public Mono<User> updateUser(User user) {
+        user.setNew(false);
         user.serializeAddresses();
         return userRepository.save(user)
                 .map(u -> {
@@ -72,5 +73,9 @@ public class UserService {
 
     public Mono<Void> deleteById(String id) {
         return userRepository.deleteById(id);
+    }
+
+    public Mono<Void> deleteByPhone(String phone) {
+        return userRepository.deleteByPhone(phone);
     }
 }

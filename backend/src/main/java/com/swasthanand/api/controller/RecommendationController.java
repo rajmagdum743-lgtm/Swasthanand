@@ -4,6 +4,7 @@ import com.swasthanand.api.dto.GoalSuggestionRequest;
 import com.swasthanand.api.dto.RecommendationRequest;
 import com.swasthanand.api.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -11,6 +12,7 @@ import reactor.core.publisher.Mono;
 @RestController
 @RequestMapping("/api/recommend")
 @RequiredArgsConstructor
+@Slf4j
 public class RecommendationController {
 
     private final RecommendationService recommendationService;
@@ -20,7 +22,7 @@ public class RecommendationController {
         return recommendationService.getRecommendations(request)
                 .map(res -> ResponseEntity.ok().body((Object) res))
                 .onErrorResume(e -> {
-                    System.err.println("Error processing recommendation: " + e.getMessage());
+                    log.error("Error processing recommendation", e);
                     return Mono.just(ResponseEntity.internalServerError().body((Object) "An error occurred while calculating recommendations. Please try again later."));
                 });
     }
@@ -30,7 +32,7 @@ public class RecommendationController {
         return recommendationService.getSmartGoalRecommendations(request)
                 .map(res -> ResponseEntity.ok().body((Object) res))
                 .onErrorResume(e -> {
-                    System.err.println("Error processing goal recommendation: " + e.getMessage());
+                    log.error("Error processing goal recommendation", e);
                     return Mono.just(ResponseEntity.internalServerError().body((Object) "An error occurred while analyzing your goal."));
                 });
     }

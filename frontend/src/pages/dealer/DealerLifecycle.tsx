@@ -22,7 +22,7 @@ const LIFECYCLE_STAGES: LifecycleStage[] = [
 ];
 
 const DealerLifecycle: React.FC = () => {
-  const { warehouse, isDarkMode } = useOutletContext<{ warehouse: string; isDarkMode: boolean }>();
+  const { warehouse, isDarkMode } = useOutletContext<{ warehouse?: string; isDarkMode?: boolean }>() || {};
   const { products } = useProducts();
   const [searchParams] = useSearchParams();
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
@@ -36,9 +36,8 @@ const DealerLifecycle: React.FC = () => {
     const bid = searchParams.get('batchId');
     if (bid && products.length > 0) {
       const prod = products.find((p: any) => p.batchId === bid || p.id === bid);
-      if (prod) {
+      if (prod && prod.id !== selectedProduct?.id) {
         setSelectedProduct(prod);
-        // Simulating stage index based on product name length or simple mapping
         const stageMap: Record<number, number> = { 0: 3, 1: 4, 2: 5 };
         const index = stageMap[prod.name.length % 3] || 3;
         setCurrentStageIndex(index);
@@ -47,7 +46,7 @@ const DealerLifecycle: React.FC = () => {
       setSelectedProduct(products[0]);
       setCurrentStageIndex(3);
     }
-  }, [searchParams, products]);
+  }, [searchParams, products, selectedProduct]);
 
   const handleSelectProduct = (prod: any) => {
     setSelectedProduct(prod);

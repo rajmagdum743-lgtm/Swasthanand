@@ -10,10 +10,13 @@ import {
   CheckCircle2, 
   AlertCircle, 
   RefreshCw, 
-  TrendingUp, 
+  TrendingUp,
   History, 
   Download,
   AlertTriangle,
+  FileText,
+  Upload,
+  ExternalLink,
   X 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -27,13 +30,23 @@ interface Product {
   stock: number; 
   image: string; 
   description: string; 
-  batchId: string; 
-  origin: string; 
-  harvestDate: string; 
+  status?: string;
+  batchId?: string; 
+  origin?: string; 
+  harvestDate?: string;
+  mfgDate?: string;
+  processingDetails?: string;
+  storageDetails?: string;
+  transportDetails?: string;
+  expiryDate?: string;
+  growthQuality?: string;
+  qualityInfo?: string;
+  certificateUrl?: string;
+  dealershipNodeId?: string;
 }
 
 const DealerInventory: React.FC = () => {
-  const { warehouse, nodeId, isDarkMode } = useOutletContext<{ warehouse: string; nodeId: string; isDarkMode: boolean }>();
+  const { warehouse, nodeId, isDarkMode } = useOutletContext<{ warehouse?: string; nodeId?: string; isDarkMode?: boolean }>() || {};
   const [searchParams, setSearchParams] = useSearchParams();
   
   const [products, setProducts] = useState<Product[]>([]);
@@ -54,35 +67,124 @@ const DealerInventory: React.FC = () => {
     benefitsDescription: '',
     stock: '50',
     origin: 'Maharashtra, India',
-    tagsInput: 'organic, immunity'
+    tagsInput: 'organic, immunity',
+    batchId: '',
+    harvestDate: new Date().toISOString().split('T')[0],
+    certificateUrl: ''
   });
+  const [proposalCertFile, setProposalCertFile] = useState<File | null>(null);
   
   // Stock history modal states
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
   const [mockHistory, setMockHistory] = useState<any[]>([]);
 
+  // Product Traceability Edit Modal States
+  const [traceOpen, setTraceOpen] = useState(false);
+  const [traceSubmitting, setTraceSubmitting] = useState(false);
+  const [traceProduct, setTraceProduct] = useState<Product | null>(null);
+  const [traceFile, setTraceFile] = useState<File | null>(null);
+  const [traceData, setTraceData] = useState({
+    batchId: '',
+    harvestDate: '',
+    mfgDate: '',
+    processingDetails: '',
+    storageDetails: '',
+    transportDetails: '',
+    expiryDate: '',
+    origin: '',
+    qualityInfo: '',
+    certificateUrl: ''
+  });
+
+  const handleOpenTraceability = (product: Product) => {
+    setTraceProduct(product);
+    setTraceData({
+      batchId: product.batchId || `SW-B-${product.id.slice(0, 5).toUpperCase()}`,
+      harvestDate: product.harvestDate || new Date().toISOString().split('T')[0],
+      mfgDate: product.mfgDate || '',
+      processingDetails: product.processingDetails || 'Solar Dried, Cold Milled, Quality Sorted',
+      storageDetails: product.storageDetails || 'Cold Storage Room B (16°C Stable)',
+      transportDetails: product.transportDetails || 'Swasthanand Temperature Controlled Freight',
+      expiryDate: product.expiryDate ? String(product.expiryDate) : '',
+      origin: product.origin || 'Satara Organic Co-op, Maharashtra',
+      qualityInfo: product.growthQuality || product.qualityInfo || '100% Pesticide Free (Grade A+)',
+      certificateUrl: product.certificateUrl || ''
+    });
+    setTraceFile(null);
+    setTraceOpen(true);
+  };
+
+  const handleSaveTraceability = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!traceProduct) return;
+    setTraceSubmitting(true);
+    try {
+      let certUrl = traceData.certificateUrl;
+      if (traceFile) {
+        const formData = new FormData();
+        formData.append('file', traceFile);
+        formData.append('productName', traceProduct.name);
+        const uploadRes = await fetch(`${API_BASE_URL}/api/files/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        if (uploadRes.ok) {
+          const fileRes = await uploadRes.json();
+          certUrl = fileRes.url;
+        }
+      }
+
+      const payload = {
+        ...traceData,
+        certificateUrl: certUrl
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/dealer/products/${traceProduct.id}/traceability`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setTraceOpen(false);
+        setSyncStatus('success');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+        fetchProducts();
+      } else {
+        alert('Failed to update product traceability.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error connecting to backend.');
+    } finally {
+      setTraceSubmitting(false);
+    }
+  };
+
   const fetchProducts = async () => {
-    if (!nodeId) return;
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/products`);
+      const token = localStorage.getItem('swasthanand_token');
+      const res = await fetch(`${API_BASE_URL}/api/dealer/inventory`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
-        const nodeProducts = data.filter((p: any) => p.dealershipNodeId === nodeId || !p.dealershipNodeId);
-        setProducts(nodeProducts.map((p: any) => ({ ...p, stock: p.stock ?? 100 })));
+        setProducts(data.map((p: any) => ({ ...p, stock: p.stock ?? 100 })));
+      } else {
+        setProducts([]);
       }
     } catch (err) { 
-      console.error(err); 
+      console.error('Error fetching dealer inventory:', err); 
+      setProducts([]);
     } finally { 
       setLoading(false); 
     }
   };
 
   useEffect(() => { 
-    if (nodeId) {
-      fetchProducts();
-    }
+    fetchProducts();
   }, [nodeId]);
 
   useEffect(() => {
@@ -100,6 +202,22 @@ const DealerInventory: React.FC = () => {
     }
     setProposalSubmitting(true);
     try {
+      let uploadedCertUrl = proposalData.certificateUrl;
+      if (proposalCertFile) {
+        const formData = new FormData();
+        formData.append('file', proposalCertFile);
+        formData.append('productName', proposalData.name);
+        const uploadRes = await fetch(`${API_BASE_URL}/api/files/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        if (uploadRes.ok) {
+          const fileRes = await uploadRes.json();
+          uploadedCertUrl = fileRes.url;
+        }
+      }
+
+      const token = localStorage.getItem('swasthanand_token');
       const payload = {
         name: proposalData.name,
         category: proposalData.category,
@@ -111,18 +229,23 @@ const DealerInventory: React.FC = () => {
         tags: proposalData.tagsInput.split(',').map(t => t.trim()).filter(Boolean),
         dealershipNodeId: nodeId,
         status: 'DEALER_ALLOCATED', // Maps to "Pending Review"
-        harvestDate: new Date().toISOString().split('T')[0],
+        batchId: proposalData.batchId || `SW-B-${Date.now().toString().slice(-6)}`,
+        harvestDate: proposalData.harvestDate || new Date().toISOString().split('T')[0],
+        certificateUrl: uploadedCertUrl,
         weatherTemp: '27°C',
-        growthQuality: 'Excellent',
+        growthQuality: '100% Organic (Grade A+ Certified)',
         organicMatter: '4.5%',
         nitrogen: '1.9%',
-        zeroPesticides: 'Verified',
+        zeroPesticides: 'Verified Pass',
         image: '/images/products/default.jpg'
       };
 
       const res = await fetch(`${API_BASE_URL}/api/products`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(payload)
       });
 
@@ -136,8 +259,12 @@ const DealerInventory: React.FC = () => {
           benefitsDescription: '',
           stock: '50',
           origin: 'Maharashtra, India',
-          tagsInput: 'organic, immunity'
+          tagsInput: 'organic, immunity',
+          batchId: '',
+          harvestDate: new Date().toISOString().split('T')[0],
+          certificateUrl: ''
         });
+        setProposalCertFile(null);
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 3000);
         fetchProducts();
@@ -166,10 +293,18 @@ const DealerInventory: React.FC = () => {
     setUpdatingId(productId);
     
     try {
-      const res = await fetch(`${API_BASE_URL}/api/products/${productId}`, {
-        method: 'PUT', 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...product, stock: newStock })
+      const token = localStorage.getItem('swasthanand_token');
+      const res = await fetch(`${API_BASE_URL}/api/dealer/inventory/${productId}/adjust`, {
+        method: 'POST', 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          quantity: amount,
+          action: increment ? 'INCREMENT' : 'DECREMENT',
+          reason: 'Manual Stock Adjustment'
+        })
       });
       if (!res.ok) throw new Error('Sync failed');
       setSyncStatus('success'); 
@@ -186,12 +321,8 @@ const DealerInventory: React.FC = () => {
 
   const handleOpenHistory = (product: Product) => {
     setHistoryProduct(product);
-    // Generate mock adjustments logs
     setMockHistory([
-      { date: 'Today, 11:20 AM', change: '+20 Units', reason: 'Received supplier delivery', operator: 'Rahul K. (Warehouse Lead)' },
-      { date: 'Yesterday, 04:45 PM', change: '-12 Units', reason: 'Order fulfillment #ORD-8392', operator: 'Amit S. (Staff)' },
-      { date: '28 Jun 2026, 09:15 AM', change: '+5 Units', reason: 'Inventory recount correction', operator: 'Rahul K. (Warehouse Lead)' },
-      { date: '24 Jun 2026, 02:30 PM', change: '-8 Units', reason: 'Order fulfillment #ORD-7391', operator: 'Amit S. (Staff)' }
+      { date: 'Initial Log', change: `${product.stock} Units`, reason: 'Dealer Inventory Setup', operator: 'Authorized Dealer' }
     ]);
     setHistoryOpen(true);
   };
@@ -278,25 +409,26 @@ const DealerInventory: React.FC = () => {
               </motion.button>
             )}
           </AnimatePresence>
-          <button 
-            onClick={() => setProposalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-100/50 active:scale-95 transition-all cursor-pointer"
-          >
-            <Plus size={13} /> Propose New Product
-          </button>
+
           <button className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all border ${
             isDarkMode ? 'text-white border-white/8 bg-white/4' : 'text-slate-700 border-slate-200 bg-white hover:bg-slate-50'
           }`}>
             <Download size={13} /> Export Sheet
           </button>
+
+          <button 
+            onClick={() => setProposalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200 cursor-pointer active:scale-95"
+          >
+            <Plus size={14} /> Add Product / Propose Item
+          </button>
         </div>
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total Products', val: stats.total, color: 'text-slate-500 dark:text-slate-300', border: 'border-slate-200 dark:border-white/5', icon: Package },
-          { label: 'Healthy Supply', val: stats.optimal, color: 'text-emerald-500', border: 'border-emerald-500/15 dark:border-emerald-500/10', icon: CheckCircle2 },
           { label: 'Low Stock alerts', val: stats.low, color: 'text-amber-500', border: 'border-amber-500/15 dark:border-amber-500/10', icon: TrendingUp },
           { label: 'Out of Stock', val: stats.outOfStock, color: 'text-rose-500', border: 'border-rose-500/15 dark:border-rose-500/10', icon: AlertCircle },
         ].map((s, i) => {
@@ -496,16 +628,29 @@ const DealerInventory: React.FC = () => {
 
                       {/* Actions */}
                       <td className="py-4 px-5 text-center">
-                        <button
-                          onClick={() => handleOpenHistory(p)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                            isDarkMode 
-                              ? 'border-white/10 text-slate-300 bg-white/4 hover:bg-white/8 hover:text-white' 
-                              : 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:text-slate-800'
-                          }`}
-                        >
-                          <History size={10} /> History
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenTraceability(p)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                              isDarkMode 
+                                ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/15' 
+                                : 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                            }`}
+                            title="Edit Product Batch & Traceability"
+                          >
+                            <FileText size={10} /> Traceability
+                          </button>
+                          <button
+                            onClick={() => handleOpenHistory(p)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                              isDarkMode 
+                                ? 'border-white/10 text-slate-300 bg-white/4 hover:bg-white/8 hover:text-white' 
+                                : 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:text-slate-800'
+                            }`}
+                          >
+                            <History size={10} /> History
+                          </button>
+                        </div>
                       </td>
                     </motion.tr>
                   );
@@ -516,18 +661,7 @@ const DealerInventory: React.FC = () => {
         )}
       </div>
 
-      {/* Bottom Alert bar */}
-      <div className={`p-4 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-3 ${
-        isDarkMode ? 'border-emerald-500/15 bg-emerald-500/5' : 'border-emerald-100 bg-emerald-50/50'
-      }`}>
-        <div>
-          <h4 className="font-extrabold text-xs dark:text-white mb-0.5">Need to request stock replenishment?</h4>
-          <p className="text-[10px] text-slate-500">Low stock products triggers order forms sent automatically to suppliers.</p>
-        </div>
-        <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-colors shrink-0">
-          Request Replenishment
-        </button>
-      </div>
+
 
       {/* STOCK HISTORY MODAL */}
       <AnimatePresence>
@@ -696,6 +830,63 @@ const DealerInventory: React.FC = () => {
                   />
                 </div>
 
+                {/* Traceability & Certification Section */}
+                <div className="pt-3 border-t border-slate-100 dark:border-white/5 space-y-3">
+                  <span className="block text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                    Traceability & Organic Certification
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Batch Number / ID</label>
+                      <input 
+                        type="text" 
+                        value={proposalData.batchId}
+                        onChange={e => setProposalData({ ...proposalData, batchId: e.target.value })}
+                        placeholder="e.g. SW-B-2026-9901"
+                        className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 focus:bg-white p-3 rounded-xl outline-none font-mono text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Harvest Date</label>
+                      <input 
+                        type="date" 
+                        value={proposalData.harvestDate}
+                        onChange={e => setProposalData({ ...proposalData, harvestDate: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 focus:bg-white p-3 rounded-xl outline-none text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Traceability / Organic Certificate File (PDF / Image)</label>
+                    <div className="flex items-center gap-2">
+                      <label className="flex-1 flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 dark:border-white/10 hover:border-emerald-500/50 rounded-xl cursor-pointer bg-slate-50 dark:bg-white/5 transition-all text-slate-600 dark:text-slate-300">
+                        <Upload size={14} className="text-emerald-500 shrink-0" />
+                        <span className="truncate text-xs font-bold">
+                          {proposalCertFile ? proposalCertFile.name : 'Click to Upload Certificate File'}
+                        </span>
+                        <input 
+                          type="file" 
+                          accept=".pdf,image/*" 
+                          className="hidden" 
+                          onChange={e => setProposalCertFile(e.target.files?.[0] || null)} 
+                        />
+                      </label>
+                      {proposalCertFile && (
+                        <button 
+                          type="button" 
+                          onClick={() => setProposalCertFile(null)} 
+                          className="p-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl border border-rose-200 dark:border-rose-900/30"
+                          title="Remove file"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100 dark:border-white/5">
                   <button 
                     type="button"
@@ -719,6 +910,175 @@ const DealerInventory: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* PRODUCT TRACEABILITY EDIT MODAL */}
+      <AnimatePresence>
+        {traceOpen && traceProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className={`w-full max-w-2xl rounded-2xl p-6 relative max-h-[90vh] overflow-y-auto ${
+                isDarkMode ? 'bg-[#0b140f] text-white border border-white/10' : 'bg-white text-slate-800 border border-slate-200'
+              }`}
+            >
+              <button 
+                onClick={() => setTraceOpen(false)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-xl bg-slate-100 dark:bg-white/5"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="mb-4">
+                <span className="block text-[8px] text-emerald-500 font-black uppercase tracking-widest">Crop Traceability Audit</span>
+                <h3 className="text-base font-black uppercase mt-0.5">Edit Traceability: {traceProduct.name}</h3>
+                <p className="text-[10px] text-slate-400 font-bold mt-0.5">Update harvest, mfg, processing, storage, transport, quality info, and optional product certificate.</p>
+              </div>
+
+              <form onSubmit={handleSaveTraceability} className="space-y-4 text-xs font-bold">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Batch Number / ID *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={traceData.batchId}
+                      onChange={e => setTraceData({ ...traceData, batchId: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Harvest Date *</label>
+                    <input 
+                      type="date" 
+                      required
+                      value={traceData.harvestDate}
+                      onChange={e => setTraceData({ ...traceData, harvestDate: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Manufacturing Date</label>
+                    <input 
+                      type="date" 
+                      value={traceData.mfgDate}
+                      onChange={e => setTraceData({ ...traceData, mfgDate: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Origin / Farm Location</label>
+                    <input 
+                      type="text" 
+                      value={traceData.origin}
+                      onChange={e => setTraceData({ ...traceData, origin: e.target.value })}
+                      placeholder="e.g. Satara Organic Farmers Co-op, MH"
+                      className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Expiry Date</label>
+                    <input 
+                      type="date" 
+                      value={traceData.expiryDate}
+                      onChange={e => setTraceData({ ...traceData, expiryDate: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Processing Details</label>
+                  <input 
+                    type="text" 
+                    value={traceData.processingDetails}
+                    onChange={e => setTraceData({ ...traceData, processingDetails: e.target.value })}
+                    placeholder="e.g. Solar Dried, Cold Milled, Hydro-Steam Sterilized"
+                    className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Storage Conditions</label>
+                    <input 
+                      type="text" 
+                      value={traceData.storageDetails}
+                      onChange={e => setTraceData({ ...traceData, storageDetails: e.target.value })}
+                      placeholder="e.g. Cold Room B (16°C, <55% RH)"
+                      className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Transportation Details</label>
+                    <input 
+                      type="text" 
+                      value={traceData.transportDetails}
+                      onChange={e => setTraceData({ ...traceData, transportDetails: e.target.value })}
+                      placeholder="e.g. Temperature Controlled Freight"
+                      className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Quality Information & Lab Status</label>
+                  <input 
+                    type="text" 
+                    value={traceData.qualityInfo}
+                    onChange={e => setTraceData({ ...traceData, qualityInfo: e.target.value })}
+                    placeholder="e.g. 100% Pesticide Free (Lab Grade A+ Verified)"
+                    className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Optional Product Traceability Certificate (PDF / Image)</label>
+                  <input 
+                    type="file" 
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={e => {
+                      if (e.target.files && e.target.files[0]) setTraceFile(e.target.files[0]);
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 dark:bg-white/5 dark:border-white/10 focus:border-emerald-500 p-2.5 rounded-xl outline-none text-xs"
+                  />
+                  {traceData.certificateUrl && !traceFile && (
+                    <div className="flex items-center gap-1.5 mt-1 text-[9px] text-emerald-500 font-bold">
+                      <ExternalLink size={11} />
+                      <a href={traceData.certificateUrl} target="_blank" rel="noreferrer" className="hover:underline truncate">View Current Product Certificate</a>
+                    </div>
+                  )}
+                  <p className="text-[8px] text-slate-400 font-medium">If omitted, the system defaults to displaying the Dealer's verified Business Certifications.</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100 dark:border-white/5">
+                  <button 
+                    type="button"
+                    onClick={() => setTraceOpen(false)}
+                    className={`w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border text-center transition-colors ${
+                      isDarkMode ? 'border-white/10 text-white hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={traceSubmitting}
+                    className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-md cursor-pointer disabled:opacity-50"
+                  >
+                    {traceSubmitting ? <Loader2 className="animate-spin" size={14} /> : <FileText size={14} />} Save Traceability Details
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };

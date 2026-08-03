@@ -29,21 +29,12 @@ window.fetch = async (input, init) => {
 
   try {
     const response = await originalFetch(input, init);
-    if ((response.status === 401 || response.status === 403) && token && token.startsWith('mock-')) {
+    if ((response.status === 401 || response.status === 403) && token) {
       localStorage.removeItem(SESSION_KEY);
       window.location.href = '/';
     }
     return response;
   } catch (err) {
-    if (token && token.startsWith('mock-')) {
-      try {
-        const ping = await originalFetch(`${API_BASE_URL}/api/auth/check-phone/9999999999`);
-        if (ping.ok) {
-          localStorage.removeItem(SESSION_KEY);
-          window.location.href = '/';
-        }
-      } catch (pingErr) {}
-    }
     throw err;
   }
 };
@@ -135,11 +126,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!saved) return null;
 
     try {
-      const { user: savedUser, token, expiry } = JSON.parse(saved);
-      if (token && token.startsWith('mock-')) {
-        localStorage.removeItem(SESSION_KEY);
-        return null;
-      }
+      const { user: savedUser, expiry } = JSON.parse(saved);
       if (new Date().getTime() < expiry) {
         return savedUser;
       }

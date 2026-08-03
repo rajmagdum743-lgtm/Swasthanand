@@ -85,33 +85,33 @@ const ContactPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/30">
 
       {/* ─── HERO ─── */}
-      <section className="relative pt-36 pb-28 px-6 overflow-hidden">
+      <section className="relative pt-28 md:pt-36 pb-16 md:pb-28 px-4 sm:px-6 overflow-hidden">
         {/* Background blobs */}
         <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-emerald-100/40 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-40 w-[500px] h-[500px] bg-sky-100/30 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-5xl mx-auto text-center relative z-10">
           <motion.div variants={fadeUp} custom={0} initial="hidden" animate="visible"
-            className="inline-flex items-center gap-2 px-5 py-2 bg-white border border-emerald-200 text-emerald-700 rounded-full text-xs font-black uppercase tracking-[0.2em] mb-8 shadow-sm">
+            className="inline-flex items-center gap-2 px-4 py-1.5 md:px-5 md:py-2 bg-white border border-emerald-200 text-emerald-700 rounded-full text-[11px] sm:text-xs font-black uppercase tracking-[0.2em] mb-6 md:mb-8 shadow-sm">
             <Sprout size={14} />
             Pure • Natural • Trusted
           </motion.div>
 
           <motion.h1 variants={fadeUp} custom={1} initial="hidden" animate="visible"
-            className="text-6xl md:text-8xl font-black text-slate-900 leading-none tracking-tighter mb-6">
+            className="text-4xl sm:text-6xl md:text-8xl font-black text-slate-900 leading-none tracking-tighter mb-4 md:mb-6">
             Let's <span className="gradient-text">Connect</span>
           </motion.h1>
 
           <motion.p variants={fadeUp} custom={2} initial="hidden" animate="visible"
-            className="text-xl text-slate-500 font-medium max-w-2xl mx-auto leading-relaxed">
+            className="text-sm sm:text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto leading-relaxed">
             Have a question, a bulk order, or just want to talk Ayurveda? We're one message away.
-            <span className="block mt-4">
+            <span className="block mt-3 md:mt-4">
               <span
                 style={{
                   fontFamily: "'Playfair Display', Georgia, serif",
                   fontStyle: 'italic',
                   fontWeight: 700,
-                  fontSize: '1.45rem',
+                  fontSize: '1.2rem',
                   background: 'linear-gradient(135deg, #059669 0%, #0d9488 50%, #0891b2 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
@@ -130,15 +130,15 @@ const ContactPage: React.FC = () => {
       </section>
 
       {/* ─── STATS BAR ─── */}
-      <section className="px-6 pb-16">
+      <section className="px-4 sm:px-6 pb-12 md:pb-16">
         <div className="max-w-5xl mx-auto">
           <motion.div variants={fadeUp} custom={3} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {stats.map((s, i) => (
               <motion.div key={s.label} custom={i} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                className="bg-white border border-slate-100 rounded-3xl p-6 text-center shadow-sm hover:shadow-lg hover:border-emerald-200 transition-all group">
-                <div className="text-3xl font-black text-slate-900 group-hover:text-emerald-600 transition-colors">{s.value}</div>
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{s.label}</div>
+                className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 text-center shadow-sm hover:shadow-lg hover:border-emerald-200 transition-all group">
+                <div className="text-2xl sm:text-3xl font-black text-slate-900 group-hover:text-emerald-600 transition-colors">{s.value}</div>
+                <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{s.label}</div>
               </motion.div>
             ))}
           </motion.div>
@@ -146,8 +146,8 @@ const ContactPage: React.FC = () => {
       </section>
 
       {/* ─── CONTACT CARDS ─── */}
-      <section className="px-6 pb-20">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+      <section className="px-4 sm:px-6 pb-16 md:pb-20">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5">
           {contactItems.map((item, i) => (
             <motion.a
               key={item.label}
@@ -158,18 +158,18 @@ const ContactPage: React.FC = () => {
               whileInView="visible"
               viewport={{ once: true }}
               whileHover={{ y: -6, scale: 1.02 }}
-              className="group relative bg-white border border-slate-100 rounded-[2rem] p-7 shadow-sm hover:shadow-2xl transition-all overflow-hidden cursor-pointer block"
+              className="group relative bg-white border border-slate-100 rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-7 shadow-sm hover:shadow-2xl transition-all overflow-hidden cursor-pointer block"
             >
               {/* Background gradient on hover */}
               <div className={`absolute inset-0 bg-gradient-to-br ${item.color} opacity-0 group-hover:opacity-5 transition-opacity rounded-[2rem]`} />
 
-              <div className={`w-14 h-14 ${item.bg} rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform`}>
-                <div className={`bg-gradient-to-br ${item.color} rounded-xl w-10 h-10 flex items-center justify-center text-white shadow-lg`}>
-                  <item.icon size={20} />
+              <div className={`w-12 h-12 sm:w-14 sm:h-14 ${item.bg} rounded-2xl flex items-center justify-center mb-4 sm:mb-5 group-hover:scale-110 transition-transform`}>
+                <div className={`bg-gradient-to-br ${item.color} rounded-xl w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-white shadow-lg`}>
+                  <item.icon size={18} className="sm:w-[20px] sm:h-[20px]" />
                 </div>
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">{item.label}</p>
-              <p className="text-lg font-black text-slate-800 leading-tight">{item.value}</p>
+              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">{item.label}</p>
+              <p className="text-base sm:text-lg font-black text-slate-800 leading-tight">{item.value}</p>
               <p className="text-xs font-medium text-slate-400 mt-1">{item.sub}</p>
               {item.href && item.href !== '#' && (
                 <ArrowRight size={16} className="absolute top-6 right-6 text-slate-200 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
@@ -180,12 +180,12 @@ const ContactPage: React.FC = () => {
       </section>
 
       {/* ─── FORM + MAP ─── */}
-      <section className="px-6 pb-28">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+      <section className="px-4 sm:px-6 pb-20 md:pb-28">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10 items-start">
 
           {/* Contact Form */}
           <motion.div variants={fadeUp} custom={0} initial="hidden" whileInView="visible" viewport={{ once: true }}
-            className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl p-10 relative overflow-hidden">
+            className="bg-white rounded-[2rem] sm:rounded-[2.5rem] border border-slate-100 shadow-xl p-5 sm:p-8 md:p-10 relative overflow-hidden">
 
             {/* Decorative leaf */}
             <div className="absolute -top-6 -right-6 opacity-5 pointer-events-none">

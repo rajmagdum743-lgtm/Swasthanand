@@ -21,7 +21,7 @@ const ProductCard: React.FC<ProductProps> = (props) => {
     setTimeout(() => setAdded(false), 2000);
   };
 
-  const isOutOfStock = props.stock === 0;
+  const isOutOfStock = props.stock === null || props.stock === undefined || props.stock <= 0 || props.status === 'SOLD';
   const [showNotify, setShowNotify] = React.useState(false);
   const [notifyContact, setNotifyContact] = React.useState('');
   const [notifyStatus, setNotifyStatus] = React.useState<'idle' | 'loading' | 'success' | 'error'>('idle');

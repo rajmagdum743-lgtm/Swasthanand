@@ -7,14 +7,17 @@ import com.swasthanand.api.service.SmsService;
 import com.swasthanand.api.dto.OtpRequest;
 import com.swasthanand.api.dto.OtpVerifyRequest;
 import com.swasthanand.api.security.JwtUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
-import java.util.HashMap;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -33,34 +36,123 @@ public class AuthController {
         this.jwtUtil = jwtUtil;
     }
 
+    /**
+     * Step 1 of OTP login: generate and dispatch a fresh OTP.
+     *
+     * <p>The SMS delivery is a potentially blocking Twilio HTTP call, so it is
+     * executed on the bounded-elastic scheduler to avoid blocking the event loop.</p>
+     *
+     * <p>Sample request:
+     * <pre>POST /api/auth/request-otp
+     * { "phone": "9284939947" }</pre>
+     * Sample success response (200):
+     * <pre>{ "success": true, "message": "OTP sent successfully" }</pre>
+     */
     @PostMapping("/request-otp")
-    public Mono<ResponseEntity<Object>> requestOtp(@RequestBody OtpRequest request) {
-        return otpService.generateOtp(request.getPhone())
-                .doOnNext(code -> smsService.sendOtp(request.getPhone(), code))
-                .map(code -> ResponseEntity.ok((Object) Map.of("success", true, "message", "OTP sent successfully")));
+    public Mono<ResponseEntity<Object>> requestOtp(@jakarta.validation.Valid @RequestBody OtpRequest request) {
+        String phone = request.getPhone();
+
+        if (phone == null || phone.isBlank()) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body((Object) Map.of("success", false, "message", "Phone number is required")));
+        }
+
+        log.info("[AUTH] OTP request received for phone={}", maskPhone(phone));
+
+        return otpService.generateOtp(phone)
+                .doOnSuccess(code ->
+                        // Fire-and-forget: SMS dispatch is non-critical to the HTTP response.
+                        // sendOtpReactive() internally offloads the blocking Twilio call to boundedElastic.
+                        smsService.sendOtpReactive(phone, code)
+                                .subscribe(
+                                        v -> log.info("[AUTH] OTP SMS dispatched for phone={}", maskPhone(phone)),
+                                        err -> log.error("[AUTH] SMS dispatch failed for phone={}: {}", maskPhone(phone), err.getMessage())
+                                )
+                )
+                .map(code -> ResponseEntity.ok((Object) Map.of("success", true, "message", "OTP sent successfully")))
+                .onErrorResume(err -> {
+                    log.error("[AUTH] Failed to generate OTP for phone={}: {}", maskPhone(phone), err.getMessage(), err);
+                    return Mono.just(ResponseEntity.internalServerError()
+                            .body((Object) Map.of("success", false, "message", "Failed to generate OTP. Please try again.")));
+                });
     }
 
+    /**
+     * Step 2 of OTP login: verify the OTP and issue a JWT on success.
+     *
+     * <p>Sample request:
+     * <pre>POST /api/auth/verify-otp
+     * { "phone": "9284939947", "otp": "482931" }</pre>
+     * Sample success response (200) – registered user:
+     * <pre>{
+     *   "success": true,
+     *   "isRegistered": true,
+     *   "token": "&lt;jwt&gt;",
+     *   "user": { ... }
+     * }</pre>
+     * Sample success response (200) – new user (not yet registered):
+     * <pre>{ "success": true, "isRegistered": false }</pre>
+     * Sample failure response (401):
+     * <pre>{ "success": false, "message": "Invalid or expired OTP" }</pre>
+     */
     @PostMapping("/verify-otp")
-    public Mono<ResponseEntity<Object>> verifyOtp(@RequestBody OtpVerifyRequest request) {
-        return otpService.verifyOtp(request.getPhone(), request.getOtp())
+    public Mono<ResponseEntity<Object>> verifyOtp(@jakarta.validation.Valid @RequestBody OtpVerifyRequest request) {
+        String phone = request.getPhone();
+        String otp = request.getOtp();
+
+        if (phone == null || phone.isBlank()) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body((Object) Map.of("success", false, "message", "Phone number is required")));
+        }
+        if (otp == null || otp.isBlank()) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body((Object) Map.of("success", false, "message", "OTP is required")));
+        }
+
+        log.info("[AUTH] OTP verification attempt for phone={}", maskPhone(phone));
+
+        return otpService.verifyOtp(phone, otp)
                 .flatMap(isValid -> {
                     if (!isValid) {
-                        return Mono.just(ResponseEntity.status(401).body((Object) Map.of("success", false, "message", "Invalid or expired OTP")));
+                        log.warn("[AUTH] OTP verification failed for phone={}", maskPhone(phone));
+                        return Mono.just(ResponseEntity.status(401)
+                                .body((Object) Map.of("success", false, "message", "Invalid or expired OTP")));
                     }
 
-                    return userService.findByPhone(request.getPhone())
+                    log.info("[AUTH] OTP verified successfully for phone={}", maskPhone(phone));
+
+                    return userService.findByPhone(phone)
                             .map(user -> {
-                                if (Boolean.FALSE.equals(user.getIsApproved())) {
-                                    return ResponseEntity.status(403).body((Object) Map.of("success", false, "message", "Your registration request is pending administrator approval."));
+                                if (user.getStatus() == User.UserStatus.PENDING_APPROVAL || Boolean.FALSE.equals(user.getIsApproved())) {
+                                    return ResponseEntity.status(403)
+                                            .body((Object) Map.of("success", false,
+                                                    "message", "Your registration request is pending administrator approval."));
+                                }
+                                if (user.getStatus() == User.UserStatus.SUSPENDED) {
+                                    return ResponseEntity.status(403)
+                                            .body((Object) Map.of("success", false,
+                                                    "message", "Your account has been suspended."));
+                                }
+                                if (user.getStatus() == User.UserStatus.REJECTED) {
+                                    return ResponseEntity.status(403)
+                                            .body((Object) Map.of("success", false,
+                                                    "message", "Your registration request was rejected."));
                                 }
                                 Map<String, Object> response = new HashMap<>();
                                 response.put("success", true);
                                 response.put("isRegistered", true);
                                 response.put("user", user);
                                 response.put("token", jwtUtil.generateToken(user));
+                                log.info("[AUTH] Login successful for phone={}", maskPhone(phone));
                                 return ResponseEntity.ok((Object) response);
                             })
-                            .defaultIfEmpty(ResponseEntity.ok((Object) Map.of("success", true, "isRegistered", false)));
+                            .defaultIfEmpty(ResponseEntity.ok(
+                                    (Object) Map.of("success", true, "isRegistered", false)));
+                })
+                .onErrorResume(err -> {
+                    log.error("[AUTH] Unexpected error during OTP verification for phone={}: {}", maskPhone(phone), err.getMessage(), err);
+                    return Mono.just(ResponseEntity.internalServerError()
+                            .body((Object) Map.of("success", false, "message", "Verification failed. Please try again.")));
                 });
     }
 
@@ -82,8 +174,14 @@ public class AuthController {
 
         return userService.findByPhone(phone)
                 .map(user -> {
-                    if (Boolean.FALSE.equals(user.getIsApproved())) {
+                    if (user.getStatus() == User.UserStatus.PENDING_APPROVAL || Boolean.FALSE.equals(user.getIsApproved())) {
                         return ResponseEntity.status(403).body((Object) Map.of("success", false, "message", "Your registration request is pending administrator approval."));
+                    }
+                    if (user.getStatus() == User.UserStatus.SUSPENDED) {
+                        return ResponseEntity.status(403).body((Object) Map.of("success", false, "message", "Your account has been suspended."));
+                    }
+                    if (user.getStatus() == User.UserStatus.REJECTED) {
+                        return ResponseEntity.status(403).body((Object) Map.of("success", false, "message", "Your registration request was rejected."));
                     }
                     if (passwordEncoder.matches(password, user.getPassword())) {
                         return ResponseEntity.ok((Object) Map.of(
@@ -123,11 +221,13 @@ public class AuthController {
                     .switchIfEmpty(Mono.defer(() -> {
                         User.Role finalRole = User.Role.CUSTOMER;
                         boolean approved = true;
+                        User.UserStatus finalStatus = User.UserStatus.ACTIVE;
                         if (registrationRequest.containsKey("role")) {
                             try {
                                 finalRole = User.Role.valueOf(((String) registrationRequest.get("role")).toUpperCase());
                                 if (finalRole == User.Role.DEALER) {
                                     approved = false;
+                                    finalStatus = User.UserStatus.PENDING_APPROVAL;
                                 }
                             } catch (Exception e) {}
                         }
@@ -139,6 +239,7 @@ public class AuthController {
                             .addresses(new ArrayList<>())
                             .role(finalRole)
                             .isApproved(approved)
+                            .status(finalStatus)
                             .build();
                         
                         User.Address firstAddress = User.Address.builder()
@@ -179,5 +280,18 @@ public class AuthController {
                     "user", updatedUser
                 )))
                 .onErrorResume(e -> Mono.just(ResponseEntity.internalServerError().body((Object) Map.of("message", "Update failed: " + e.getMessage()))));
+    }
+
+    // ------------------------------------------------------------------
+    // Private helpers
+    // ------------------------------------------------------------------
+
+    /**
+     * Masks a phone number so only the last 2 digits are visible in logs.
+     * e.g. "9284939947" → "********47"
+     */
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() <= 2) return "****";
+        return "*".repeat(phone.length() - 2) + phone.substring(phone.length() - 2);
     }
 }

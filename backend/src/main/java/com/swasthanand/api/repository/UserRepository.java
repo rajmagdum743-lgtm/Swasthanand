@@ -6,4 +6,5 @@ import reactor.core.publisher.Mono;
 
 public interface UserRepository extends R2dbcRepository<User, String> {
     Mono<User> findByPhone(String phone);
+    Mono<Void> deleteByPhone(String phone);
 }

@@ -2,15 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../../config/api';
 import { useProducts } from '../../context/ProductContext';
-import { Search, Loader2, CheckCircle2, ArrowRight, ShieldCheck, FileText, Boxes, HelpCircle, Leaf, FlaskConical, Truck, Store, Calendar } from 'lucide-react';
+import { Search, Loader2, CheckCircle2, ShieldCheck, FileText, Leaf, FlaskConical, Truck, Store, ArrowRight, Calendar, HelpCircle, Boxes } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface TraceStep { title: string; subtitle: string; status: 'completed' | 'active' | 'upcoming'; description: string; meta?: Record<string, string>; icon: any; }
+interface TraceStep {
+  title: string;
+  subtitle: string;
+  status: 'completed' | 'active' | 'upcoming';
+  description: string;
+  meta?: Record<string, string>;
+  icon: any;
+}
 
 const stepIcons = [Leaf, FlaskConical, Truck, ShieldCheck, Store];
 
 const DealerTraceability: React.FC = () => {
-  const { warehouse, isDarkMode } = useOutletContext<{ warehouse: string; isDarkMode: boolean }>();
+  const { warehouse, nodeId, isDarkMode } = useOutletContext<{ warehouse?: string; nodeId?: string; isDarkMode?: boolean }>() || {};
   const { products } = useProducts();
   const [searchParams] = useSearchParams();
   const [searchId, setSearchId] = useState('');
@@ -129,8 +136,8 @@ const DealerTraceability: React.FC = () => {
       subtitle: 'Step 4: Stock Allocated', 
       status: 'active', 
       icon: ShieldCheck,
-      description: `Stock verified and allocated in ${warehouse} for B2B dispatch.`,
-      meta: { 'Warehouse Name': warehouse, 'Batch Tracking Code': `SW-B-${product.id.slice(0,5).toUpperCase()}` }
+      description: `Stock verified and allocated in ${warehouse || 'Swasthanand Warehouse'} for B2B dispatch.`,
+      meta: { 'Warehouse Name': warehouse || 'Swasthanand Warehouse', 'Batch Tracking Code': `SW-B-${product.id.slice(0,5).toUpperCase()}` }
     },
     { 
       title: 'Available on Retail Shelf', 
@@ -193,7 +200,7 @@ const DealerTraceability: React.FC = () => {
             Quick Select Batch Code
           </span>
           <div className="flex flex-wrap gap-2">
-            {(products as any[]).filter(p => p.batchId).map(p => {
+            {(products as any[]).filter(p => p.dealerId || (nodeId && p.dealershipNodeId === nodeId)).map(p => {
               const isActive = activeChipId === p.id;
               return (
                 <button
@@ -206,11 +213,13 @@ const DealerTraceability: React.FC = () => {
                   }`}
                   style={isActive && isDarkMode ? { background: 'linear-gradient(135deg, rgba(11,79,53,0.4), rgba(16,185,129,0.15))' } : {}}
                 >
-                  {p.name} ({p.batchId})
+                  {p.name} ({p.batchId || p.sku || 'No Batch'})
                 </button>
               );
             })}
-            {(products as any[]).length === 0 && <span className="text-xs text-slate-400">No active batches loaded.</span>}
+            {(products as any[]).filter(p => p.dealerId || (nodeId && p.dealershipNodeId === nodeId)).length === 0 && (
+              <span className="text-xs text-slate-400">No dealer batches or products found. Add products to trace their harvest origin.</span>
+            )}
           </div>
         </div>
       </div>

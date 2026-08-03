@@ -8,9 +8,7 @@ import {
   CheckCircle2,
   Warehouse,
   Truck,
-  Bell,
   Scan,
-  FileText,
   X,
   Play,
   Plus
@@ -26,7 +24,7 @@ interface Order {
 }
 
 const DealerDashboard: React.FC = () => {
-  const { warehouse, nodeId, isDarkMode } = useOutletContext<{ warehouse: string; nodeId: string; isDarkMode: boolean }>();
+  const { warehouse, nodeId, isDarkMode } = useOutletContext<{ warehouse?: string; nodeId?: string; isDarkMode?: boolean }>() || {};
   const { products, loading: productsLoading } = useProducts() as any;
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -87,7 +85,10 @@ const DealerDashboard: React.FC = () => {
   const fetchOrders = async () => {
     try {
       setOrdersLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/orders/node/${nodeId}`);
+      const token = localStorage.getItem('swasthanand_token');
+      const res = await fetch(`${API_BASE_URL}/api/dealer/orders`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
         setOrders(data);
@@ -100,22 +101,17 @@ const DealerDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    if (nodeId) {
-      fetchOrders();
-    }
+    fetchOrders();
   }, [nodeId]);
 
-  // Filter products assigned to this dealer's node (allow unassigned defaults)
-  const dealerProducts = products.filter((p: any) => p.dealershipNodeId === nodeId || !p.dealershipNodeId);
+  // Scoped dealer products
+  const dealerProducts = products.filter((p: any) => p.dealerId || p.dealershipNodeId === nodeId);
   const lowStockProducts = dealerProducts.filter((p: any) => (p.stock ?? 100) < 15);
   const pendingOrders = orders.filter(o => ['PENDING', 'CONFIRMED', 'TRANSIT', 'SHIPPED'].includes(o.status));
   const completedOrders = orders.filter(o => o.status === 'DELIVERED');
 
-  // Expiry mock calculation: products with harvest dates older than 6 months or mocked expiry warnings
-  const expiringProducts = dealerProducts.filter((_: any, idx: number) => idx % 4 === 0).map((p: any) => ({
-    ...p,
-    daysLeft: 5 + (p.name.length % 25)
-  }));
+  // Expiry data comes from real backend only
+  const expiringProducts: any[] = [];
 
   const stats = [
     { title: 'My Products', value: `${dealerProducts.length} Items`, desc: 'Active catalog listings', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
@@ -127,17 +123,11 @@ const DealerDashboard: React.FC = () => {
   const quickActions = [
     { label: 'Verify Stock', icon: Scan, onClick: openScanner, bg: 'from-emerald-500 to-teal-600', text: 'Scan items using camera / SKU' },
     { label: 'My Catalog', icon: Package, link: '/dealer/inventory', bg: 'from-blue-500 to-indigo-600', text: 'Check stock levels and details' },
-    { label: 'Propose New Product', icon: Plus, link: '/dealer/inventory?propose=true', bg: 'from-amber-500 to-orange-600', text: 'Submit new item for approval' },
-    { label: 'B2B Procurement', icon: Truck, link: '/dealer/orders', bg: 'from-purple-500 to-pink-600', text: 'Accept and process B2B orders' },
-    { label: 'Supply Reports', icon: FileText, link: '/dealer/reports', bg: 'from-slate-600 to-slate-800', text: 'Download supply logs & audits' }
+    { label: 'Propose New Product', icon: Plus, link: '/dealer/inventory?propose=true', bg: 'from-amber-500 to-orange-600', text: 'Submit new item for approval', hidden: true },
+    { label: 'B2B Procurement', icon: Truck, link: '/dealer/orders', bg: 'from-purple-500 to-pink-600', text: 'Accept and process B2B orders' }
   ];
 
-  const recentActivities = [
-    { type: 'order', text: 'New order #ORD-9284 received from Karad Organics', time: '10 mins ago', date: 'Today' },
-    { type: 'stock', text: 'Moringa Powder stock updated: +50 units', time: '1 hour ago', date: 'Today' },
-    { type: 'order', text: 'Order #ORD-7381 marked as Dispatched to Kolhapur Store', time: '3 hours ago', date: 'Today' },
-    { type: 'alert', text: 'Low stock alert: Organic Wild Honey down to 4 units', time: '5 hours ago', date: 'Today' }
-  ];
+  const recentActivities: { type: string; text: string; time: string; date: string }[] = [];
 
   // Simulating barcode/QR scanning
   const triggerMockScan = (product: any) => {
@@ -204,7 +194,7 @@ const DealerDashboard: React.FC = () => {
                 {orders.filter(o => {
                   const today = new Date().toDateString();
                   return new Date(o.createdAt).toDateString() === today;
-                }).length + 3} Orders
+                }).length} Orders
               </span>
             </div>
             <div className={`text-center px-4 py-3 rounded-2xl border ${isDarkMode ? 'border-white/8 bg-white/3' : 'border-slate-200 bg-white'}`}>
@@ -221,7 +211,7 @@ const DealerDashboard: React.FC = () => {
       <div className="space-y-3">
         <h3 className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Quick Actions</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {quickActions.map((action, i) => {
+          {quickActions.filter((action) => !action.hidden).map((action, i) => {
             const Icon = action.icon;
             return action.link ? (
               <Link
@@ -379,7 +369,7 @@ const DealerDashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Recent Activity */}
-        <div className={`p-5 rounded-2xl lg:col-span-2 ${cardClass}`}>
+        <div className={`p-5 rounded-2xl lg:col-span-3 ${cardClass}`}>
           <div className="pb-4 border-b border-slate-100 dark:border-white/5 mb-4">
             <h3 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
               <Clock size={14} className="text-emerald-500" /> Recent Activity
@@ -397,27 +387,6 @@ const DealerDashboard: React.FC = () => {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* System Announcements */}
-        <div className={`p-5 rounded-2xl ${cardClass}`}>
-          <div className="pb-4 border-b border-slate-100 dark:border-white/5 mb-4">
-            <h3 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 text-blue-500">
-              <Bell size={14} /> System Alerts
-            </h3>
-            <p className="text-[9px] text-slate-400 font-bold">Announcements for warehouse staff</p>
-          </div>
-
-          <div className="space-y-4 text-xs font-bold text-slate-600 dark:text-slate-300">
-            <div className="p-3 rounded-xl border border-blue-500/15 bg-blue-500/5">
-              <p className="text-blue-500 text-[10px] font-black uppercase tracking-wider mb-1">Cold Storage Upgrade</p>
-              <p className="leading-relaxed">Site B cold room maintenance tomorrow between 2 AM to 4 AM. Temperature alarms will be disabled.</p>
-            </div>
-            <div className="p-3 rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/2">
-              <p className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-wider mb-1">New Mobile App Version</p>
-              <p className="leading-relaxed">Please update your Capacitor wrapper to v2.1 for improved barcode scanning speeds.</p>
-            </div>
           </div>
         </div>
 

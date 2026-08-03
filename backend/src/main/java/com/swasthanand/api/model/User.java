@@ -30,6 +30,8 @@ public class User implements Persistable<String> {
     @JsonProperty("isApproved")
     private Boolean isApproved;
     
+    private UserStatus status;
+    
     private String addressesJson; // DB column containing serialized addresses list
 
     @Transient
@@ -71,6 +73,10 @@ public class User implements Persistable<String> {
 
     public enum Role {
         CUSTOMER, ADMIN, FARMER, DEALER
+    }
+
+    public enum UserStatus {
+        PENDING_APPROVAL, ACTIVE, SUSPENDED, REJECTED, APPROVED
     }
 
     @Transient

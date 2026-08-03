@@ -15,12 +15,11 @@ import java.util.Map;
 @Component
 public class JwtUtil {
 
-    private static final String SECRET_STRING = "SwasthanandSuperSecretKeyForJWTAuthTokenSigning1234567890!@#$";
     private static final long EXPIRATION_TIME = 86400000; // 24 hours in milliseconds
     private final SecretKey secretKey;
 
-    public JwtUtil() {
-        this.secretKey = Keys.hmacShaKeyFor(SECRET_STRING.getBytes(StandardCharsets.UTF_8));
+    public JwtUtil(@org.springframework.beans.factory.annotation.Value("${app.jwt.secret}") String secretString) {
+        this.secretKey = Keys.hmacShaKeyFor(secretString.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(User user) {

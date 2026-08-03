@@ -116,24 +116,24 @@ const TraceabilityPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/20">
 
       {/* ── HERO ── */}
-      <section className="relative pt-36 pb-20 px-6 overflow-hidden">
+      <section className="relative pt-28 md:pt-36 pb-16 md:pb-20 px-4 sm:px-6 overflow-hidden">
         <div className="absolute -top-32 -right-32 w-[500px] h-[500px] bg-emerald-100/30 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-20 -left-32 w-[400px] h-[400px] bg-sky-100/20 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <motion.div variants={fadeUp} custom={0} initial="hidden" animate="visible"
-            className="inline-flex items-center gap-2 px-5 py-2 bg-white border border-emerald-200 text-emerald-700 rounded-full text-xs font-black uppercase tracking-[0.2em] mb-8 shadow-sm">
+            className="inline-flex items-center gap-2 px-4 py-1.5 md:px-5 md:py-2 bg-white border border-emerald-200 text-emerald-700 rounded-full text-[11px] sm:text-xs font-black uppercase tracking-[0.2em] mb-6 md:mb-8 shadow-sm">
             <Scan size={13} />
             Blockchain-Backed Transparency
           </motion.div>
 
           <motion.h1 variants={fadeUp} custom={1} initial="hidden" animate="visible"
-            className="text-6xl md:text-8xl font-black text-slate-900 leading-none tracking-tighter mb-6">
+            className="text-4xl sm:text-6xl md:text-8xl font-black text-slate-900 leading-none tracking-tighter mb-4 md:mb-6">
             Track Your <span className="gradient-text">Food's</span><br />Journey
           </motion.h1>
 
           <motion.p variants={fadeUp} custom={2} initial="hidden" animate="visible"
-            className="text-xl text-slate-500 font-medium max-w-2xl mx-auto mb-10 leading-relaxed">
+            className="text-sm sm:text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed">
             Every product has a story. Enter your batch ID to trace its path —
             from the farm soil to your doorstep.
           </motion.p>
@@ -142,8 +142,8 @@ const TraceabilityPage: React.FC = () => {
           <motion.form variants={fadeUp} custom={3} initial="hidden" animate="visible"
             onSubmit={handleSearch}
             className="max-w-2xl mx-auto relative group">
-            <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-slate-400 group-focus-within:text-emerald-500 transition-colors">
-              <Search size={22} />
+            <div className="absolute inset-y-0 left-4 sm:left-6 flex items-center pointer-events-none text-slate-400 group-focus-within:text-emerald-500 transition-colors">
+              <Search size={20} className="sm:w-[22px] sm:h-[22px]" />
             </div>
             <input
               id="batch-search"
@@ -151,17 +151,17 @@ const TraceabilityPage: React.FC = () => {
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               placeholder="Enter Batch ID (e.g. SWS-2024-001)"
-              className="w-full pl-16 pr-36 py-6 bg-white border-2 border-slate-100 rounded-[28px] shadow-xl shadow-slate-200/40 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all text-lg font-bold"
+              className="w-full pl-12 sm:pl-16 pr-24 sm:pr-36 py-4 sm:py-6 bg-white border-2 border-slate-100 rounded-[20px] sm:rounded-[28px] shadow-xl shadow-slate-200/40 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/10 outline-none transition-all text-sm sm:text-lg font-bold"
             />
             <button type="submit"
-              className="absolute right-3 top-3 bottom-3 px-8 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-[20px] font-black text-sm uppercase tracking-wider hover:from-emerald-700 hover:to-emerald-800 transition-all flex items-center gap-2 shadow-lg shadow-emerald-200">
-              Verify <ArrowRight size={16} />
+              className="absolute right-2 sm:right-3 top-2 sm:top-3 bottom-2 sm:bottom-3 px-4 sm:px-8 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-[16px] sm:rounded-[20px] font-black text-xs sm:text-sm uppercase tracking-wider hover:from-emerald-700 hover:to-emerald-800 transition-all flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-emerald-200">
+              Verify <ArrowRight size={14} className="sm:w-[16px] sm:h-[16px]" />
             </button>
           </motion.form>
 
           {/* How it works hint */}
           <motion.div variants={fadeUp} custom={4} initial="hidden" animate="visible"
-            className="flex items-center justify-center gap-2 mt-5 text-slate-400 text-sm font-medium">
+            className="flex items-center justify-center gap-2 mt-4 md:mt-5 text-slate-400 text-xs sm:text-sm font-medium">
             <Info size={14} />
             Find the Batch ID printed on your product package or QR code
           </motion.div>
@@ -169,23 +169,23 @@ const TraceabilityPage: React.FC = () => {
       </section>
 
       {/* ── TRUST STATS ── */}
-      <section className="px-6 pb-16">
-        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="px-4 sm:px-6 pb-12 md:pb-16">
+        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {trustStats.map((s, i) => (
             <motion.div key={s.label} custom={i} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
-              className="bg-white border border-slate-100 rounded-3xl p-5 text-center shadow-sm hover:shadow-md hover:border-emerald-100 transition-all">
-              <div className={`w-10 h-10 ${s.bg} rounded-2xl flex items-center justify-center mx-auto mb-3`}>
-                <s.icon size={20} className={s.color} />
+              className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-center shadow-sm hover:shadow-md hover:border-emerald-100 transition-all">
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 ${s.bg} rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-2 sm:mb-3`}>
+                <s.icon size={18} className={s.color} />
               </div>
-              <div className={`text-2xl font-black ${s.color}`}>{s.value}</div>
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">{s.label}</div>
+              <div className={`text-xl sm:text-2xl font-black ${s.color}`}>{s.value}</div>
+              <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">{s.label}</div>
             </motion.div>
           ))}
         </div>
       </section>
 
       {/* ── RESULTS AREA ── */}
-      <section className="px-6 pb-28">
+      <section className="px-4 sm:px-6 pb-20 md:pb-28">
         <div className="max-w-5xl mx-auto">
           <AnimatePresence mode="wait">
 
@@ -207,12 +207,12 @@ const TraceabilityPage: React.FC = () => {
             {!loading && error && (
               <motion.div key="error" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
                 className="max-w-md mx-auto">
-                <div className="bg-red-50 border-2 border-red-100 rounded-[32px] p-10 text-center">
-                  <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                    <AlertCircle size={30} className="text-red-500" />
+                <div className="bg-red-50 border-2 border-red-100 rounded-[28px] sm:rounded-[32px] p-6 sm:p-10 text-center">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-5">
+                    <AlertCircle size={28} className="text-red-500" />
                   </div>
-                  <h3 className="text-xl font-black text-red-900 mb-2">Batch Not Found</h3>
-                  <p className="text-red-600 font-medium text-sm leading-relaxed">{error}</p>
+                  <h3 className="text-lg sm:text-xl font-black text-red-900 mb-2">Batch Not Found</h3>
+                  <p className="text-red-600 font-medium text-xs sm:text-sm leading-relaxed">{error}</p>
                   <div className="mt-4 px-4 py-2 bg-red-100 rounded-xl text-xs font-black text-red-400 uppercase tracking-widest inline-block">
                     Code: TRACE_NOT_FOUND
                   </div>
@@ -223,27 +223,27 @@ const TraceabilityPage: React.FC = () => {
             {/* Data */}
             {!loading && !error && batchData && (
               <motion.div key="data" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }} className="space-y-10">
+                transition={{ duration: 0.6 }} className="space-y-6 md:space-y-10">
 
                 {/* ── BATCH ID CARD (QR-style) ── */}
                 <motion.div variants={fadeUp} custom={0} initial="hidden" animate="visible"
-                  className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-emerald-200">
+                  className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 text-white relative overflow-hidden shadow-2xl shadow-emerald-200">
                   <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/5 rounded-full" />
                   <div className="absolute -bottom-16 -left-8 w-64 h-64 bg-white/5 rounded-full" />
 
-                  <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
                     <div>
-                      <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center gap-2 mb-2 sm:mb-3">
                         <div className="w-2.5 h-2.5 bg-emerald-300 rounded-full animate-pulse" />
-                        <span className="text-emerald-300 text-xs font-black uppercase tracking-widest">Verified Batch</span>
+                        <span className="text-emerald-300 text-[10px] sm:text-xs font-black uppercase tracking-widest">Verified Batch</span>
                       </div>
-                      <h2 className="text-3xl font-black tracking-tight mb-1">Batch Authenticated ✓</h2>
-                      <p className="text-white/70 font-medium text-sm">This product has been traced and verified by Swasthanand</p>
+                      <h2 className="text-2xl sm:text-3xl font-black tracking-tight mb-1">Batch Authenticated ✓</h2>
+                      <p className="text-white/70 font-medium text-xs sm:text-sm">This product has been traced and verified by Swasthanand</p>
                     </div>
-                    <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl px-6 py-4 min-w-[220px]">
-                      <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Batch ID</p>
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-black font-mono">{batchData.id}</span>
+                    <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl px-5 sm:px-6 py-3 sm:py-4 w-full md:w-auto min-w-[200px]">
+                      <p className="text-white/60 text-[9px] sm:text-[10px] font-black uppercase tracking-widest mb-1">Batch ID</p>
+                      <div className="flex items-center justify-between md:justify-start gap-3">
+                        <span className="text-base sm:text-lg font-black font-mono">{batchData.id}</span>
                         <button onClick={() => copyToClipboard(batchData.id)}
                           className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
                           {copied ? <Check size={14} className="text-emerald-300" /> : <Copy size={14} />}
@@ -254,17 +254,17 @@ const TraceabilityPage: React.FC = () => {
                 </motion.div>
 
                 {/* ── MAIN GRID ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
 
                   {/* Left: Journey Timeline */}
-                  <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-10">
-                    <div className="flex items-center gap-3 mb-10">
-                      <div className="w-11 h-11 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-                        <Globe size={22} />
+                  <div className="lg:col-span-2 bg-white rounded-[2rem] sm:rounded-[2.5rem] border border-slate-100 shadow-sm p-5 sm:p-8 md:p-10">
+                    <div className="flex items-center gap-3 mb-6 md:mb-10">
+                      <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                        <Globe size={20} />
                       </div>
                       <div>
-                        <h2 className="text-xl font-black text-slate-900 tracking-tight">Full Journey Map</h2>
-                        <p className="text-xs text-slate-400 font-bold">Click each step to learn more</p>
+                        <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Full Journey Map</h2>
+                        <p className="text-[10px] sm:text-xs text-slate-400 font-bold">Click each step to learn more</p>
                       </div>
                     </div>
 

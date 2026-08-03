@@ -18,6 +18,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebFluxSecurity
+@org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity
 public class SecurityConfig {
 
     private final SecurityContextRepository securityContextRepository;
@@ -34,6 +35,13 @@ public class SecurityConfig {
     }
 
     @Bean
+    public org.springframework.security.access.hierarchicalroles.RoleHierarchy roleHierarchy() {
+        return org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl.fromHierarchy(
+            "ROLE_ADMIN > ROLE_DEALER\nROLE_DEALER > ROLE_CUSTOMER"
+        );
+    }
+
+    @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
@@ -41,13 +49,20 @@ public class SecurityConfig {
             .securityContextRepository(securityContextRepository)
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
-                .pathMatchers("/api/auth/**", "/api/recommend/**", "/api/locations/**").permitAll()
+                .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
+                .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/request-otp").permitAll()
+                .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/verify-otp").permitAll()
+                .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/auth/check-phone/**").permitAll()
+                .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/login").permitAll()
+                .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/register").permitAll()
+                .pathMatchers("/api/recommend/**", "/api/locations/**").permitAll()
                 .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/products/**").permitAll()
                 .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/products/**").hasAnyRole("ADMIN", "DEALER")
                 .pathMatchers(org.springframework.http.HttpMethod.PUT, "/api/products/**").hasAnyRole("ADMIN", "DEALER")
                 .pathMatchers(org.springframework.http.HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
                 .pathMatchers("/api/admin/**").hasRole("ADMIN")
                 .pathMatchers("/api/dealer/**").hasRole("DEALER")
+                .pathMatchers(org.springframework.http.HttpMethod.PUT, "/api/auth/profile").authenticated()
                 .anyExchange().permitAll()
             );
         

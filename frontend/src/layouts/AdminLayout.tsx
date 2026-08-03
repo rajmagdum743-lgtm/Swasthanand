@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, Outlet, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -6,7 +7,6 @@ import {
   Package,
   Users,
   Building2,
-  TrendingUp,
   Settings,
   LogOut,
   Home,
@@ -17,7 +17,102 @@ import {
   Activity
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import PasswordInput from '../components/common/PasswordInput';
 import { motion, AnimatePresence } from 'framer-motion';
+
+interface AdminLoginFormProps {
+  onSuccess?: () => void;
+}
+
+const AdminLoginForm: React.FC<AdminLoginFormProps> = ({ onSuccess }) => {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone || !password) {
+      setError('Please enter mobile number and password');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const u = await login(phone, password);
+      if (!u || u.role !== 'ADMIN') {
+        setError('This account does not have Admin privileges.');
+      } else {
+        localStorage.setItem('admin_authenticated_session', 'true');
+        if (onSuccess) onSuccess();
+        navigate('/admin/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Login failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#070b12] flex flex-col items-center justify-center p-6 text-white selection:bg-teal-500 selection:text-white">
+      <div className="w-full max-w-md bg-[#0c1410] border border-white/10 rounded-3xl p-8 shadow-2xl space-y-6">
+        <div className="text-center space-y-2">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center mx-auto shadow-lg shadow-teal-500/20 mb-3">
+            <img src="/logo.png" alt="Swasthanand" className="w-10 h-10 object-contain brightness-0 invert" />
+          </div>
+          <h2 className="text-2xl font-black tracking-tight text-white">Admin Console</h2>
+          <p className="text-xs text-slate-400 font-medium">Executive administrators only. Input authorized credentials.</p>
+        </div>
+
+        {error && (
+          <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2">
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Mobile Number</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              placeholder="10-digit mobile number"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm font-bold text-white outline-none focus:border-teal-500 transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Password</label>
+            <PasswordInput
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Enter password"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm font-bold text-white outline-none focus:border-teal-500 transition-colors"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-50"
+          >
+            {loading ? 'Authenticating...' : 'Sign In to Console'}
+          </button>
+        </form>
+
+        <div className="text-center pt-2">
+          <Link to="/" className="text-xs font-bold text-slate-500 hover:text-slate-300 transition-colors">
+            ← Back to Swasthanand Store
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AdminLayout: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -25,10 +120,43 @@ const AdminLayout: React.FC = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const [notifPos, setNotifPos] = useState({ top: 0, right: 0 });
+  const [sessionActive, setSessionActive] = useState(() => {
+    return localStorage.getItem('admin_authenticated_session') === 'true';
+  });
 
-  // Security Gate
+  const updateNotifPos = () => {
+    if (bellRef.current) {
+      const rect = bellRef.current.getBoundingClientRect();
+      setNotifPos({
+        top: rect.bottom + 8,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    }
+  };
+
+  const toggleNotif = () => {
+    if (!notifOpen) {
+      updateNotifPos();
+    }
+    setNotifOpen(prev => !prev);
+  };
+
+  useEffect(() => {
+    if (notifOpen) {
+      window.addEventListener('resize', updateNotifPos);
+      window.addEventListener('scroll', updateNotifPos, true);
+      return () => {
+        window.removeEventListener('resize', updateNotifPos);
+        window.removeEventListener('scroll', updateNotifPos, true);
+      };
+    }
+  }, [notifOpen]);
+
+  // Security Gate: Show AdminLoginForm if not authenticated or not an admin
   if (!isAuthenticated || user?.role !== 'ADMIN') {
-    return <Navigate to="/" replace />;
+    return <AdminLoginForm onSuccess={() => setSessionActive(true)} />;
   }
 
   const menuItems = [
@@ -36,9 +164,7 @@ const AdminLayout: React.FC = () => {
     { path: '/admin/products', label: 'Products', icon: Package, desc: 'Inventory catalog' },
     { path: '/admin/orders', label: 'Orders', icon: ShoppingBag, desc: 'All transactions' },
     { path: '/admin/dealers', label: 'Dealers', icon: Building2, desc: 'Warehouse nodes' },
-    { path: '/admin/customers', label: 'Customers', icon: Users, desc: 'Consumer management' },
-    { path: '/admin/analytics', label: 'Analytics', icon: TrendingUp, desc: 'Revenue & growth' },
-    { path: '/admin/settings', label: 'Settings', icon: Settings, desc: 'Console parameters' }
+    { path: '/admin/customers', label: 'Customers', icon: Users, desc: 'Consumer management' }
   ];
 
   const notifications = [
@@ -48,8 +174,10 @@ const AdminLayout: React.FC = () => {
   ];
 
   const handleLogout = () => {
+    localStorage.removeItem('admin_authenticated_session');
+    setSessionActive(false);
     logout();
-    navigate('/');
+    navigate('/admin');
   };
 
   const currentPath = location.pathname;
@@ -218,40 +346,6 @@ const AdminLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Notification Hub */}
-            <div className="relative">
-              <button onClick={() => setNotifOpen(!notifOpen)} className="relative w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-teal-500/30 transition-all bg-slate-50">
-                <Bell size={16} />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border border-white" />
-              </button>
-              <AnimatePresence>
-                {notifOpen && (
-                  <motion.div initial={{ opacity: 0, y: 8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                    className="absolute top-full right-0 mt-2 w-80 rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 overflow-hidden"
-                  >
-                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-800">Console Alerts</span>
-                      <span className="text-[9px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">3 Messages</span>
-                    </div>
-                    <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-                      {notifications.map((n, i) => (
-                        <div key={i} className="flex items-start gap-3 p-4 hover:bg-slate-50 transition-colors">
-                          <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${
-                            n.severity === 'high' ? 'bg-red-500 animate-pulse' : n.severity === 'medium' ? 'bg-amber-500' : 'bg-slate-400'
-                          }`} />
-                          <div>
-                            <p className="text-xs font-black text-slate-800 leading-snug">{n.title}</p>
-                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-0.5">{n.desc}</p>
-                            <p className="text-[9px] text-slate-400 font-bold mt-1">{n.time}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
             {/* Status Indicator */}
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-500/20 bg-emerald-50 text-emerald-700">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

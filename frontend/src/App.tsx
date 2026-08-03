@@ -20,8 +20,6 @@ import AdminProducts from './pages/admin/AdminProducts';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminDealers from './pages/admin/AdminDealers';
 import AdminCustomers from './pages/admin/AdminCustomers';
-import AdminAnalytics from './pages/admin/AdminAnalytics';
-import AdminSettings from './pages/admin/AdminSettings';
 
 // Dealer layout and pages
 import DealerLayout from './layouts/DealerLayout';
@@ -31,10 +29,7 @@ import DealerOrders from './pages/dealer/DealerOrders';
 import DealerTraceability from './pages/dealer/DealerTraceability';
 import DealerLifecycle from './pages/dealer/DealerLifecycle';
 import DealerNotifications from './pages/dealer/DealerNotifications';
-import DealerReports from './pages/dealer/DealerReports';
 import DealerProfile from './pages/dealer/DealerProfile';
-
-
 
 function App() {
   const { isAuthenticated, user } = useAuth();
@@ -54,13 +49,22 @@ function App() {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  // Redirect on login — only if not already on role-appropriate page
+  // Route protection logic (prevents unauthorized access without overriding public website browsing)
   useEffect(() => {
     if (isAuthenticated) {
-      if (user?.role === 'ADMIN' && !location.pathname.startsWith('/admin')) {
-        navigate('/admin/dashboard');
-      } else if (user?.role === 'DEALER' && !location.pathname.startsWith('/dealer')) {
-        navigate('/dealer/dashboard');
+      if (user?.role === 'CUSTOMER') {
+        if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/dealer')) {
+          navigate('/', { replace: true });
+        }
+      } else if (user?.role === 'ADMIN' && location.pathname.startsWith('/dealer')) {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (user?.role === 'DEALER' && location.pathname.startsWith('/admin')) {
+        navigate('/dealer/dashboard', { replace: true });
+      }
+    } else {
+      // Unauthenticated access protection: allow /admin to render AdminLoginForm, redirect /dealer to homepage
+      if (location.pathname.startsWith('/dealer')) {
+        navigate('/', { replace: true });
       }
     }
   }, [isAuthenticated, user, navigate, location.pathname]);
@@ -86,7 +90,7 @@ function App() {
   if (isDealerRoute) {
     return (
       <Routes>
-        <Route path="/dealer" element={<DealerLayout />}>
+        <Route path="/dealer/*" element={<DealerLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<DealerDashboard />} />
           <Route path="inventory" element={<DealerInventory />} />
@@ -94,8 +98,8 @@ function App() {
           <Route path="traceability" element={<DealerTraceability />} />
           <Route path="lifecycle" element={<DealerLifecycle />} />
           <Route path="notifications" element={<DealerNotifications />} />
-          <Route path="reports" element={<DealerReports />} />
           <Route path="profile" element={<DealerProfile />} />
+          <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Route>
       </Routes>
     );
@@ -105,15 +109,15 @@ function App() {
   if (isAdminRoute) {
     return (
       <Routes>
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route path="/admin/*" element={<AdminLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="products" element={<AdminProducts />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="dealers" element={<AdminDealers />} />
           <Route path="customers" element={<AdminCustomers />} />
-          <Route path="analytics" element={<AdminAnalytics />} />
-          <Route path="settings" element={<AdminSettings />} />
+          <Route path="login" element={<AdminDashboard />} />
+          <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Route>
       </Routes>
     );

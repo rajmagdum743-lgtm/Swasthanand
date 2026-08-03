@@ -7,13 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface UserInfo { id: string; name: string; phone: string; }
 interface Order { id: string; user: UserInfo; totalAmount: number; status: string; razorpayOrderId: string; createdAt: string; }
 
-const MOCK_ORDERS: Order[] = [
-  { id: 'B2B-REQ-5819', user: { id: 'c1', name: 'Swasthanand Central Platform', phone: 'N/A' }, totalAmount: 18450, status: 'CONFIRMED', razorpayOrderId: 'rzp_test_1', createdAt: new Date(Date.now() - 3 * 3600000).toISOString() },
-  { id: 'B2B-REQ-4720', user: { id: 'c2', name: 'Swasthanand Central Platform', phone: 'N/A' }, totalAmount: 8900, status: 'PENDING', razorpayOrderId: 'rzp_test_2', createdAt: new Date(Date.now() - 8 * 3600000).toISOString() },
-  { id: 'B2B-REQ-2038', user: { id: 'c3', name: 'Swasthanand Central Platform', phone: 'N/A' }, totalAmount: 32400, status: 'TRANSIT', razorpayOrderId: 'rzp_test_3', createdAt: new Date(Date.now() - 24 * 3600000).toISOString() },
-  { id: 'B2B-REQ-1192', user: { id: 'c4', name: 'Swasthanand Central Platform', phone: 'N/A' }, totalAmount: 51200, status: 'DELIVERED', razorpayOrderId: 'rzp_test_4', createdAt: new Date(Date.now() - 48 * 3600000).toISOString() },
-];
-
 const ORDER_STEPS = ['PENDING', 'CONFIRMED', 'TRANSIT', 'DELIVERED'];
 
 const statusConfig: Record<string, { color: string; bg: string; border: string; label: string }> = {
@@ -26,7 +19,7 @@ const statusConfig: Record<string, { color: string; bg: string; border: string; 
 };
 
 const DealerOrders: React.FC = () => {
-  const { warehouse, nodeId, isDarkMode } = useOutletContext<{ warehouse: string; nodeId: string; isDarkMode: boolean }>();
+  const { warehouse, nodeId, isDarkMode } = useOutletContext<{ warehouse?: string; nodeId?: string; isDarkMode?: boolean }>() || {};
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
@@ -35,33 +28,37 @@ const DealerOrders: React.FC = () => {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
-    if (!nodeId) return;
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/orders/node/${nodeId}`);
+      const token = localStorage.getItem('swasthanand_token');
+      const res = await fetch(`${API_BASE_URL}/api/dealer/orders`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
-        setOrders(data?.length > 0 ? data : MOCK_ORDERS);
+        setOrders(data || []);
       } else { 
-        setOrders(MOCK_ORDERS); 
+        setOrders([]); 
       }
     } catch { 
-      setOrders(MOCK_ORDERS); 
+      setOrders([]); 
     } finally { 
       setLoading(false); 
     }
   };
 
   useEffect(() => { 
-    if (nodeId) {
-      fetchOrders();
-    }
+    fetchOrders();
   }, [nodeId]);
 
   const handleUpdateStatus = async (orderId: string, nextStatus: string) => {
     setUpdatingId(orderId);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status?status=${nextStatus}`, { method: 'PUT' });
+      const token = localStorage.getItem('swasthanand_token');
+      const res = await fetch(`${API_BASE_URL}/api/dealer/orders/${orderId}/status?status=${nextStatus}`, {
+        method: 'PUT',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (res.ok) { 
         const u = await res.json(); 
         setOrders(p => p.map(o => o.id === orderId ? u : o)); 

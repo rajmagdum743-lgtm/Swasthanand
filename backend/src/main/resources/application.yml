@@ -3,22 +3,50 @@ spring:
     name: swasthanand-api
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
-  r2dbc:
-    url: r2dbc:mssql://localhost:1433/swasthanand?trustServerCertificate=true
-    username: sa
-    password: 123
   data:
     redis:
-      host: localhost
-      port: 6379
-
+      repositories:
+        enabled: false
+  r2dbc:
+    url: ${SPRING_R2DBC_URL:r2dbc:postgresql://127.0.0.1:5432/swasthanand?sslMode=disable}
+    username: ${SPRING_R2DBC_USERNAME:postgres}
+    password: ${SPRING_R2DBC_PASSWORD:0018}
+  redis:
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
+    timeout: ${SPRING_REDIS_TIMEOUT:2000ms}
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
 
 server:
-  port: 8081
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:SwasthanandSuperSecretKeyForJWTAuthTokenSigning1234567890!@#$}
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 logging:
   level:
-    org.hibernate.SQL: DEBUG
+    root: INFO
+    org.springframework.r2dbc: INFO
+    io.r2dbc.postgresql.QUERY: DEBUG
+    # OTP auth flow – always visible at INFO so generated OTPs appear in logs during simulator mode
+    com.swasthanand.api.service.OtpService: INFO
+    com.swasthanand.api.controller.AuthController: INFO
 
 twilio:
   account:
@@ -27,3 +55,8 @@ twilio:
     token: ${TWILIO_AUTH_TOKEN:YOUR_TWILIO_TOKEN}
   phone:
     number: ${TWILIO_PHONE_NUMBER:YOUR_TWILIO_PHONE_NUMBER}
+
+fast2sms:
+  api:
+    key: ${FAST2SMS_API_KEY:YOUR_FAST2SMS_API_KEY}
+

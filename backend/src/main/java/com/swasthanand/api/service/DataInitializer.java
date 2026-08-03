@@ -1,14 +1,7 @@
 package com.swasthanand.api.service;
 
-import com.swasthanand.api.model.Product;
-import com.swasthanand.api.model.User;
-import com.swasthanand.api.model.FarmBatch;
-import com.swasthanand.api.repository.ProductRepository;
-import com.swasthanand.api.repository.FarmBatchRepository;
-import com.swasthanand.api.model.DealershipNode;
-import com.swasthanand.api.repository.DealershipNodeRepository;
-import com.swasthanand.api.model.Order;
-import com.swasthanand.api.repository.OrderRepository;
+import com.swasthanand.api.model.*;
+import com.swasthanand.api.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -32,16 +25,19 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final DealershipNodeRepository dealershipNodeRepository;
     private final OrderRepository orderRepository;
+    private final BatchRepository batchRepository;
 
     @Override
     public void run(String... args) throws Exception {
         log.info("Initializing Swasthanand Product Data...");
         
-        initializeAdmin()
+        userService.deleteByPhone("8408043381")
+            .then(initializeAdmin())
             .then(initializeDealer())
             .then(initializeAshishPassword())
             .then(initializeSampleBatchAndProducts())
             .then(initializeSampleOrders())
+            .then(initializeSampleBatches())
             .doOnError(err -> log.error("Error during data initialization: ", err))
             .doOnSuccess(v -> log.info("Swasthanand Data Initialized Successfully."))
             .subscribe();
@@ -54,6 +50,7 @@ public class DataInitializer implements CommandLineRunner {
                 existingAdmin.setPassword(passwordEncoder.encode("admin123"));
                 existingAdmin.setRole(User.Role.ADMIN);
                 existingAdmin.setIsApproved(true);
+                existingAdmin.setStatus(User.UserStatus.ACTIVE);
                 return userService.updateUser(existingAdmin);
             })
             .switchIfEmpty(Mono.defer(() -> {
@@ -63,6 +60,7 @@ public class DataInitializer implements CommandLineRunner {
                         .name("Swasthanand Admin")
                         .role(User.Role.ADMIN)
                         .isApproved(true)
+                        .status(User.UserStatus.ACTIVE)
                         .addresses(new ArrayList<>())
                         .build();
                 return userService.registerUser(admin);
@@ -78,6 +76,7 @@ public class DataInitializer implements CommandLineRunner {
                 existingDealer.setPassword(passwordEncoder.encode("admin123"));
                 existingDealer.setRole(User.Role.DEALER);
                 existingDealer.setIsApproved(true);
+                existingDealer.setStatus(User.UserStatus.ACTIVE);
                 return userService.updateUser(existingDealer);
             })
             .switchIfEmpty(Mono.defer(() -> {
@@ -87,6 +86,7 @@ public class DataInitializer implements CommandLineRunner {
                         .name("Swasthanand Dealer")
                         .role(User.Role.DEALER)
                         .isApproved(true)
+                        .status(User.UserStatus.ACTIVE)
                         .addresses(new ArrayList<>())
                         .build();
                 return userService.registerUser(dealer);
@@ -133,38 +133,45 @@ public class DataInitializer implements CommandLineRunner {
                 }
             })
             .flatMap(batch -> {
-                Mono<Void> p1 = initializeProduct("Organic Turmeric Finger", 
-                    "Premium organic turmeric fingers sourced from Sangli.",
-                    "Behold Haridra, the golden healer of the ancient texts. Its potent Ushna (heating) properties accelerate the Medo-Dhatu (fat) metabolism, while its Lekhana (scraping) action purifies the channels. For one seeking strength and weight correction, this is the sovereign remedy provided by Mother Earth herself.",
-                    new BigDecimal("299.00"),
-                    "Spices",
-                    Arrays.asList("weight-loss", "immunity", "inflammation"),
-                    batch.getId(),
-                    "satara-coop-node-id");
+                return userService.findByPhone("9284939947")
+                    .flatMap(dealer -> {
+                        String dId = dealer != null ? dealer.getId() : null;
+                        Mono<Void> p1 = initializeProduct("Organic Turmeric Finger", 
+                            "Premium organic turmeric fingers sourced from Sangli.",
+                            "Behold Haridra, the golden healer of the ancient texts. Its potent Ushna (heating) properties accelerate the Medo-Dhatu (fat) metabolism, while its Lekhana (scraping) action purifies the channels. For one seeking strength and weight correction, this is the sovereign remedy provided by Mother Earth herself.",
+                            new BigDecimal("299.00"),
+                            "Spices",
+                            Arrays.asList("weight-loss", "immunity", "inflammation"),
+                            batch.getId(),
+                            "satara-coop-node-id",
+                            dId);
 
-                Mono<Void> p2 = initializeProduct("Pure A2 Vedic Ghee", 
-                    "Hand-churned A2 ghee from grass-fed Desi cows.",
-                    "Samskara Ghee is the very essence of Agni. Contrary to common misunderstanding, pure A2 Ghee acts as a lubrication for the intestines, enhancing the 'Ojas' and stimulating the digestive fire. It assists in the healthy assimilation of nutrients while gently flushing out toxins.",
-                    new BigDecimal("850.00"),
-                    "Dairy",
-                    Arrays.asList("weight-loss", "digestion", "skin", "energy"),
-                    batch.getId(),
-                    "satara-coop-node-id");
+                        Mono<Void> p2 = initializeProduct("Pure A2 Vedic Ghee", 
+                            "Hand-churned A2 ghee from grass-fed Desi cows.",
+                            "Samskara Ghee is the very essence of Agni. Contrary to common misunderstanding, pure A2 Ghee acts as a lubrication for the intestines, enhancing the 'Ojas' and stimulating the digestive fire. It assists in the healthy assimilation of nutrients while gently flushing out toxins.",
+                            new BigDecimal("850.00"),
+                            "Dairy",
+                            Arrays.asList("weight-loss", "digestion", "skin", "energy"),
+                            batch.getId(),
+                            "satara-coop-node-id",
+                            dId);
 
-                Mono<Void> p3 = initializeProduct("Moringa Powder (Shigru)", 
-                    "Organic moringa leaf powder rich in nutrients.",
-                    "Shigru, the 'Miracle Tree', is a powerhouse of Prana. Its bitter and pungent taste pacifies Kapha and Vata alike. It provides deep nourishment to the tissues while ensuring the lightness of the body. For those battling fatigue, Moringa serves as the sharp arrow that clears the fog.",
-                    new BigDecimal("199.00"),
-                    "Supplements",
-                    Arrays.asList("immunity", "joint-pain", "weight-loss", "energy"),
-                    batch.getId(),
-                    "satara-coop-node-id");
+                        Mono<Void> p3 = initializeProduct("Moringa Powder (Shigru)", 
+                            "Organic moringa leaf powder rich in nutrients.",
+                            "Shigru, the 'Miracle Tree', is a powerhouse of Prana. Its bitter and pungent taste pacifies Kapha and Vata alike. It provides deep nourishment to the tissues while ensuring the lightness of the body. For those battling fatigue, Moringa serves as the sharp arrow that clears the fog.",
+                            new BigDecimal("199.00"),
+                            "Supplements",
+                            Arrays.asList("immunity", "joint-pain", "weight-loss", "energy"),
+                            batch.getId(),
+                            "satara-coop-node-id",
+                            dId);
 
-                return Mono.when(p1, p2, p3);
+                        return Mono.when(p1, p2, p3);
+                    });
             });
     }
 
-    private Mono<Void> initializeProduct(String name, String desc, String benefit, BigDecimal price, String category, List<String> tags, String batchId, String nodeId) {
+    private Mono<Void> initializeProduct(String name, String desc, String benefit, BigDecimal price, String category, List<String> tags, String batchId, String nodeId, String dealerId) {
         return productRepository.findByNameContainingIgnoreCase(name)
             .collectList()
             .flatMap(existingList -> {
@@ -188,6 +195,7 @@ public class DataInitializer implements CommandLineRunner {
                         .stock(100)
                         .status(Product.LifecycleState.QC_PASSED)
                         .dealershipNodeId(nodeId)
+                        .dealerId(dealerId)
                         .isApproved(true)
                         .build();
                     product.serializeTags();
@@ -199,6 +207,9 @@ public class DataInitializer implements CommandLineRunner {
                     existing.setTags(new ArrayList<>(tags));
                     existing.setBatchId(batchId);
                     existing.setDealershipNodeId(nodeId);
+                    if (dealerId != null) {
+                        existing.setDealerId(dealerId);
+                    }
                     if (existing.getStock() == null) {
                         existing.setStock(100);
                     }
@@ -231,6 +242,43 @@ public class DataInitializer implements CommandLineRunner {
                 order.setNew(true);
                 return orderRepository.save(order);
             }))
+            .then();
+    }
+
+    private Mono<Void> initializeSampleBatches() {
+        return batchRepository.count()
+            .flatMap(count -> {
+                if (count == 0) {
+                    Batch b1 = Batch.builder()
+                        .id("batch-turmeric-01")
+                        .sku("TURM-FING-01")
+                        .manufacturingDate(LocalDate.now().minusDays(15))
+                        .expiryDate(LocalDate.now().plusMonths(12))
+                        .qcStatus(Batch.QCStatus.PASSED)
+                        .currentState(Product.LifecycleState.QC_PASSED)
+                        .dealerAllocation("satara-coop-node-id")
+                        .warehouse("Main Warehouse Pune")
+                        .inventory(100)
+                        .build();
+
+                    Batch b2 = Batch.builder()
+                        .id("batch-ghee-01")
+                        .sku("GHEE-VEDIC-02")
+                        .manufacturingDate(LocalDate.now().minusDays(20))
+                        .expiryDate(LocalDate.now().plusMonths(6))
+                        .qcStatus(Batch.QCStatus.PASSED)
+                        .currentState(Product.LifecycleState.DEALER_ALLOCATED)
+                        .dealerAllocation("satara-coop-node-id")
+                        .warehouse("Main Warehouse Pune")
+                        .inventory(150)
+                        .build();
+
+                    return batchRepository.save(b1)
+                            .then(batchRepository.save(b2))
+                            .then();
+                }
+                return Mono.empty();
+            })
             .then();
     }
 }

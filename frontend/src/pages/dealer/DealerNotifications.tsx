@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
-import { Bell, ShoppingBag, AlertTriangle, Info, Truck, Check, Trash2 } from 'lucide-react';
+import { Bell, ShoppingBag, AlertTriangle, Info, Truck, Check, Trash2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../../config/api';
 
 interface NotificationItem {
   id: string;
@@ -12,32 +13,89 @@ interface NotificationItem {
   isRead: boolean;
   actionLink?: string;
   actionLabel?: string;
+  isBackendAlert?: boolean;
 }
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  { id: '1', type: 'order', title: 'New Retailer Order Received', desc: 'Pune Wholefoods Co-Op placed a new B2B shipment request #ORD-4720 worth ₹8,900.', time: '2 mins ago', isRead: false, actionLink: '/dealer/orders', actionLabel: 'View Order' },
-  { id: '2', type: 'low_stock', title: 'Low Stock Alert (Amla Candy)', desc: 'Sweet Amla Candy stock level is at 2 units, which is below the minimum threshold of 10.', time: '15 mins ago', isRead: false, actionLink: '/dealer/inventory', actionLabel: 'Update Stock' },
-  { id: '3', type: 'expiry', title: 'Product Expiring Soon', desc: 'Traditional Organic Ghee Batch GT-302 is expiring in 15 days. Please prioritize fulfillment.', time: '1 hour ago', isRead: false, actionLink: '/dealer/inventory', actionLabel: 'View Details' },
-  { id: '4', type: 'update', title: 'Shipment Dispatch Success', desc: 'B2B order #ORD-5819 has been successfully dispatched to Kolhapur Organic Mart.', time: '3 hours ago', isRead: true, actionLink: '/dealer/orders', actionLabel: 'Track Delivery' },
-  { id: '5', type: 'system', title: 'Cold-chain Temperature Warning', desc: 'Cold Storage Room B detected a brief 2-degree temperature rise. Log verified stable now.', time: '5 hours ago', isRead: true },
-  { id: '6', type: 'system', title: 'Weekly Maintenance Schedule', desc: 'Main power backup systems will undergo routine testing on Sunday between 1:00 AM and 3:00 AM.', time: '1 day ago', isRead: true }
-];
+interface BackendAlert {
+  id: string;
+  dealerId: string;
+  subject: string;
+  message: string;
+  messageType: string;
+  isRead: boolean;
+  createdAt: string;
+}
 
 const DealerNotifications: React.FC = () => {
-  const { isDarkMode } = useOutletContext<{ isDarkMode: boolean }>();
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const { isDarkMode } = useOutletContext<{ isDarkMode?: boolean }>() || {};
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'warnings' | 'system'>('all');
+  const [loading, setLoading] = useState(false);
 
-  const handleMarkAsRead = (id: string) => {
+  const fetchAlerts = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/dealer/alerts`);
+      if (res.ok) {
+        const backendAlerts: BackendAlert[] = await res.json();
+        if (backendAlerts && backendAlerts.length > 0) {
+          const mappedAlerts: NotificationItem[] = backendAlerts.map(a => {
+            let mappedType: NotificationItem['type'] = 'system';
+            const mt = (a.messageType || '').toUpperCase();
+            if (mt === 'WARNING') mappedType = 'expiry';
+            else if (mt === 'IMPORTANT') mappedType = 'low_stock';
+            else if (mt === 'SUCCESS') mappedType = 'update';
+
+            const createdDate = a.createdAt ? new Date(a.createdAt) : new Date();
+
+            return {
+              id: a.id,
+              type: mappedType,
+              title: a.subject,
+              desc: a.message,
+              time: createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + createdDate.toLocaleDateString(),
+              isRead: a.isRead !== false,
+              isBackendAlert: true
+            };
+          });
+
+          setNotifications(mappedAlerts);
+        } else {
+          setNotifications([]);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load dealer alerts from backend:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAlerts();
+  }, []);
+
+  const handleMarkAsRead = async (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    try {
+      await fetch(`${API_BASE_URL}/api/dealer/alerts/${id}/read`, { method: 'PUT' });
+    } catch (e) {}
   };
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    notifications.filter(n => n.isBackendAlert && !n.isRead).forEach(async (n) => {
+      try {
+        await fetch(`${API_BASE_URL}/api/dealer/alerts/${n.id}/read`, { method: 'PUT' });
+      } catch (e) {}
+    });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
+    try {
+      await fetch(`${API_BASE_URL}/api/dealer/alerts/${id}`, { method: 'DELETE' });
+    } catch (e) {}
   };
 
   const getIcon = (type: NotificationItem['type']) => {
@@ -86,8 +144,8 @@ const DealerNotifications: React.FC = () => {
               Alert Center
             </span>
           </div>
-          <h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Notifications</h2>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Stay updated with order requests, inventory alarms, and depot news.</p>
+          <h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Admin & System Alerts</h2>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">Stay updated with official Admin instructions, order requests, and inventory alarms.</p>
         </div>
         {unreadCount > 0 && (
           <button 
@@ -124,7 +182,12 @@ const DealerNotifications: React.FC = () => {
       {/* Notifications List */}
       <div className="space-y-3">
         <AnimatePresence initial={false}>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="p-12 flex flex-col items-center justify-center gap-2">
+              <Loader2 className="animate-spin text-emerald-500" size={24} />
+              <p className="text-xs text-slate-400 font-bold">Checking for Admin alerts...</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className={`p-16 rounded-2xl border text-center ${cardClass}`}>
               <Check size={28} className="text-slate-400 mx-auto mb-2" />
               <h4 className="font-black text-xs uppercase tracking-wider mb-1">Clear Inbox</h4>
@@ -137,7 +200,7 @@ const DealerNotifications: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, x: 20 }}
               className={`p-4 rounded-2xl border flex items-start gap-4 transition-all ${cardClass} ${
-                !n.isRead ? 'ring-2 ring-emerald-500/10' : ''
+                !n.isRead ? 'ring-2 ring-emerald-500/20 bg-emerald-500/5' : ''
               }`}
             >
               {/* Type Badge Icon */}
@@ -152,35 +215,40 @@ const DealerNotifications: React.FC = () => {
                     <h4 className={`text-xs font-black leading-tight ${n.isRead ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-white'}`}>
                       {n.title}
                     </h4>
+                    {n.isBackendAlert && (
+                      <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800">
+                        Official Admin Alert
+                      </span>
+                    )}
                     {!n.isRead && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     )}
                   </div>
                   <span className="text-[8px] text-slate-400 dark:text-slate-500 font-bold shrink-0">{n.time}</span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-2xl">{n.desc}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed max-w-2xl">{n.desc}</p>
                 
-                {/* Embedded CTA Buttons */}
-                {n.actionLink && (
-                  <div className="mt-3 flex gap-2">
+                {/* Embedded CTA Buttons or Mark Read Button */}
+                <div className="mt-3 flex gap-2">
+                  {n.actionLink && (
                     <Link
                       to={n.actionLink}
                       className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-wider rounded-lg text-center"
                     >
                       {n.actionLabel || 'View'}
                     </Link>
-                    {!n.isRead && (
-                      <button
-                        onClick={() => handleMarkAsRead(n.id)}
-                        className={`px-3 py-1.5 border text-[9px] font-black uppercase tracking-wider rounded-lg text-center cursor-pointer ${
-                          isDarkMode ? 'border-white/10 text-white hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        Mark Read
-                      </button>
-                    )}
-                  </div>
-                )}
+                  )}
+                  {!n.isRead && (
+                    <button
+                      onClick={() => handleMarkAsRead(n.id)}
+                      className={`px-3 py-1.5 border text-[9px] font-black uppercase tracking-wider rounded-lg text-center cursor-pointer transition-colors ${
+                        isDarkMode ? 'border-white/10 text-white hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Mark Read
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Delete button */}

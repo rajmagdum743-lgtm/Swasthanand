@@ -194,17 +194,21 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
             body: JSON.stringify(orderData)
           });
 
-          if (response.ok) {
+          const resData = await response.json().catch(() => ({}));
+
+          if (response.ok && resData && resData.success !== false) {
             clearCart();
             setIsLoading(false);
             setStep(3);
           } else {
-            throw new Error('Failed to create order');
+            const msg = resData?.message || 'Failed to place order due to inventory restriction.';
+            showPaymentError(msg);
+            setIsLoading(false);
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('Order creation failed:', err);
           setIsLoading(false);
-          alert('Failed to place order.');
+          showPaymentError(err.message || 'Failed to place order.');
         }
       }
     }
@@ -226,13 +230,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white rounded-[40px] shadow-2xl z-[201] overflow-hidden"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-2xl bg-white rounded-[28px] sm:rounded-[40px] shadow-2xl z-[201] overflow-hidden max-h-[90vh] flex flex-col"
           >
             {/* Header */}
-            <div className="p-8 pb-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-4 sm:p-8 pb-3 sm:pb-4 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Checkout</h2>
-                <div className="flex items-center gap-2 mt-2">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Checkout</h2>
+                <div className="flex items-center gap-2 mt-1 sm:mt-2">
                   <div className={`w-2 h-2 rounded-full ${step >= 1 ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                   <div className={`w-8 h-1 rounded-full ${step >= 2 ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                   <div className={`w-2 h-2 rounded-full ${step >= 3 ? 'bg-emerald-500' : 'bg-slate-200'}`} />
@@ -241,13 +245,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
               </div>
               <button
                 onClick={onClose}
-                className="p-3 hover:bg-slate-50 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+                className="p-2 sm:p-3 hover:bg-slate-50 rounded-full transition-colors text-slate-400 hover:text-slate-600"
               >
-                <X size={24} />
+                <X size={20} className="sm:w-[24px] sm:h-[24px]" />
               </button>
             </div>
 
-            <div className="p-10">
+            <div className="p-4 sm:p-8 md:p-10 overflow-y-auto flex-1">
               <AnimatePresence mode="wait">
                 {step === 1 && (
                   <motion.div
