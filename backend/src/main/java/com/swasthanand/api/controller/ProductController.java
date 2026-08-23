@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import java.security.Principal;
@@ -57,7 +58,7 @@ public class ProductController {
                 : productService.getAllProducts();
 
         return products.flatMap(p -> {
-            if (Boolean.TRUE.equals(p.getIsApproved())) {
+            if (p.getIsApproved() == null || Boolean.TRUE.equals(p.getIsApproved())) {
                 return Mono.just(ProductResponse.from(p));
             }
             if (principal == null) {
@@ -124,12 +125,14 @@ public class ProductController {
     }
 
     @PutMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
     public Mono<ResponseEntity<ProductResponse>> approveProduct(@PathVariable String id) {
         return productService.approveProduct(id)
                 .map(product -> ResponseEntity.ok(ProductResponse.from(product)));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Mono<ResponseEntity<Void>> deleteProduct(@PathVariable String id) {
         return productService.deleteProduct(id)
                 .thenReturn(ResponseEntity.noContent().<Void>build());
@@ -168,9 +171,19 @@ public class ProductController {
     }
 
     @GetMapping("/node/dealer/{dealerId}")
-    public Mono<ResponseEntity<com.swasthanand.api.model.DealershipNode>> getDealershipNodeByDealer(@PathVariable String dealerId) {
-        return dealershipNodeRepository.findByAssignedDealerId(dealerId)
-                .map(ResponseEntity::ok)
+    public Mono<ResponseEntity<com.swasthanand.api.model.DealershipNode>> getDealershipNodeByDealer(@PathVariable String dealerId, Principal principal) {
+        if (principal == null) {
+            return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        }
+        return userRepository.findByPhone(principal.getName())
+                .flatMap(user -> {
+                    if (user.getRole() == com.swasthanand.api.model.User.Role.ADMIN || (user.getRole() == com.swasthanand.api.model.User.Role.DEALER && user.getId().equals(dealerId))) {
+                        return dealershipNodeRepository.findByAssignedDealerId(dealerId)
+                                .map(ResponseEntity::ok)
+                                .defaultIfEmpty(ResponseEntity.notFound().build());
+                    }
+                    return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to node details for this dealer"));
+                })
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 }

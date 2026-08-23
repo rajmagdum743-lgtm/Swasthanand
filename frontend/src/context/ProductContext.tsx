@@ -34,16 +34,104 @@ interface ProductContextType {
   refreshProducts: () => void;
 }
 
+export const DEFAULT_PRODUCTS: Product[] = [
+  {
+    id: 'prod-turmeric-01',
+    name: 'Organic Turmeric Finger',
+    price: 299,
+    image: '/images/products/organic-turmeric-finger.jpg',
+    batchId: 'F-SANGLI-2024-01',
+    category: 'Spices',
+    sku: 'TURM-FING-01',
+    stock: 100,
+    origin: 'Sangli, Maharashtra',
+    description: 'Premium handpicked organic turmeric fingers rich in natural curcumin (5.2%). Sourced from certified agro-cooperatives.',
+    benefitsDescription: 'Behold Haridra, the golden healer of ancient texts. Its Ushna (heating) properties accelerate fat metabolism while its Lekhana (scraping) action purifies micro-channels.',
+    harvestDate: '2026-07-28',
+    weatherTemp: '28°C',
+    growthQuality: 'Grade A+',
+    organicMatter: '4.2%',
+    nitrogen: '1.8%',
+    zeroPesticides: '0.00% Verified',
+    certificateUrl: 'https://example.com/reports/soil-001.pdf',
+    isApproved: true
+  },
+  {
+    id: 'prod-ghee-01',
+    name: 'Pure A2 Vedic Ghee',
+    price: 850,
+    image: '/images/products/pure-a2-vedic-ghee.jpg',
+    batchId: 'F-SATARA-2024-02',
+    category: 'Dairy',
+    sku: 'GHEE-VEDIC-02',
+    stock: 85,
+    origin: 'Satara, Maharashtra',
+    description: 'Bilona method hand-churned A2 ghee prepared from free-range Gir desi cow milk.',
+    benefitsDescription: 'Samskara Ghee is the very essence of Agni. It lubricates tissues, enhances Ojas, and stimulates digestive fire for optimal vitality.',
+    harvestDate: '2026-08-01',
+    weatherTemp: '26°C',
+    growthQuality: 'Excellent',
+    organicMatter: '4.5%',
+    nitrogen: '2.0%',
+    zeroPesticides: '0.00% Verified',
+    certificateUrl: 'https://example.com/reports/ghee-002.pdf',
+    isApproved: true
+  },
+  {
+    id: 'prod-moringa-01',
+    name: 'Moringa Leaf Powder (Shigru)',
+    price: 199,
+    image: '/images/products/moringa-powder-(shigru).jpg',
+    batchId: 'F-KOLHAPUR-2024-03',
+    category: 'Supplements',
+    sku: 'MOR-POW-03',
+    stock: 120,
+    origin: 'Kolhapur, Maharashtra',
+    description: 'Shade-dried nutrient-dense organic drumstick leaf powder packed with antioxidants and bio-available iron.',
+    benefitsDescription: 'Shigru is a powerhouse of Prana. Its bitter-pungent taste balances Kapha and Vata, clearing cellular fatigue and boosting energy.',
+    harvestDate: '2026-08-04',
+    weatherTemp: '29°C',
+    growthQuality: 'Grade A+',
+    organicMatter: '4.1%',
+    nitrogen: '1.9%',
+    zeroPesticides: '0.00% Verified',
+    certificateUrl: 'https://example.com/reports/moringa-003.pdf',
+    isApproved: true
+  },
+  {
+    id: 'prod-mustard-01',
+    name: 'Cold Pressed Mustard Oil',
+    price: 349,
+    image: '/images/products/cold-pressed-mustard-oil.jpg',
+    batchId: 'F-SOLAPUR-2024-04',
+    category: 'Oils',
+    sku: 'OIL-MUST-04',
+    stock: 90,
+    origin: 'Solapur, Maharashtra',
+    description: 'Traditional kachi ghani cold pressed pure organic mustard oil from unrefined seeds.',
+    benefitsDescription: 'Pure Kachi Ghani Mustard Oil warms the digestive tract, clears Vata stagnation, and promotes healthy circulation.',
+    harvestDate: '2026-07-22',
+    weatherTemp: '30°C',
+    growthQuality: 'Grade A+',
+    organicMatter: '4.4%',
+    nitrogen: '2.0%',
+    zeroPesticides: '0.00% Verified',
+    certificateUrl: 'https://example.com/reports/oil-004.pdf',
+    isApproved: true
+  }
+];
+
 // ─── Cache helpers ────────────────────────────────────────────────────────────
-const CACHE_KEY      = 'swasthanand_products_cache_v1';
+const CACHE_KEY      = 'swasthanand_products_cache_v2';
 const CACHE_TIME_KEY = 'swasthanand_products_sync_time';
 
 const loadCache = (): Product[] => {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as Product[]) : [];
+    const parsed = raw ? (JSON.parse(raw) as Product[]) : [];
+    return parsed.length > 0 ? parsed : DEFAULT_PRODUCTS;
   } catch {
-    return [];
+    return DEFAULT_PRODUCTS;
   }
 };
 
@@ -96,9 +184,13 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data: Product[] = await response.json();
 
-      // ✅ Online: refresh UI + save to cache
-      applyProducts(data);
-      saveCache(data);
+      if (data && data.length > 0) {
+        applyProducts(data);
+        saveCache(data);
+      } else {
+        const cached = loadCache();
+        applyProducts(cached.length > 0 ? cached : DEFAULT_PRODUCTS);
+      }
       setLastSynced(getSyncLabel());
       setIsOffline(false);
     } catch (err) {
@@ -106,9 +198,7 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       // ⚠️ Offline: keep showing whatever is already in state (loaded from cache on init)
       const cached = loadCache();
-      if (cached.length > 0) {
-        applyProducts(cached);
-      }
+      applyProducts(cached.length > 0 ? cached : DEFAULT_PRODUCTS);
       setIsOffline(true);
     }
   };

@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -27,27 +29,45 @@ public class DataInitializer implements CommandLineRunner {
     private final OrderRepository orderRepository;
     private final BatchRepository batchRepository;
 
+    @Value("${app.demo-data.enabled:false}")
+    private boolean demoDataEnabled;
+
+    @Value("${app.demo-data.admin-password:}")
+    private String demoAdminPassword;
+
+    @Value("${app.demo-data.dealer-password:}")
+    private String demoDealerPassword;
+
     @Override
     public void run(String... args) throws Exception {
-        log.info("Initializing Swasthanand Product Data...");
+        if (!demoDataEnabled) {
+            log.info("Demo data seeding is disabled (app.demo-data.enabled=false). Startup complete.");
+            return;
+        }
+
+        log.info("Initializing Swasthanand Demo Data...");
         
-        userService.deleteByPhone("8408043381")
-            .then(initializeAdmin())
+        initializeAdmin()
             .then(initializeDealer())
-            .then(initializeAshishPassword())
             .then(initializeSampleBatchAndProducts())
             .then(initializeSampleOrders())
             .then(initializeSampleBatches())
-            .doOnError(err -> log.error("Error during data initialization: ", err))
-            .doOnSuccess(v -> log.info("Swasthanand Data Initialized Successfully."))
+            .doOnError(err -> log.error("Error during demo data initialization: ", err))
+            .doOnSuccess(v -> log.info("Swasthanand Demo Data Initialized Successfully."))
             .subscribe();
     }
 
     private Mono<Void> initializeAdmin() {
         String adminPhone = "9999999999";
+        String encodedPassword = (demoAdminPassword != null && !demoAdminPassword.isBlank()) 
+                ? passwordEncoder.encode(demoAdminPassword) 
+                : null;
+
         return userService.findByPhone(adminPhone)
             .flatMap(existingAdmin -> {
-                existingAdmin.setPassword(passwordEncoder.encode("admin123"));
+                if (encodedPassword != null) {
+                    existingAdmin.setPassword(encodedPassword);
+                }
                 existingAdmin.setRole(User.Role.ADMIN);
                 existingAdmin.setIsApproved(true);
                 existingAdmin.setStatus(User.UserStatus.ACTIVE);
@@ -56,7 +76,7 @@ public class DataInitializer implements CommandLineRunner {
             .switchIfEmpty(Mono.defer(() -> {
                 User admin = User.builder()
                         .phone(adminPhone)
-                        .password(passwordEncoder.encode("admin123"))
+                        .password(encodedPassword != null ? encodedPassword : "")
                         .name("Swasthanand Admin")
                         .role(User.Role.ADMIN)
                         .isApproved(true)
@@ -70,10 +90,16 @@ public class DataInitializer implements CommandLineRunner {
 
     private Mono<Void> initializeDealer() {
         String dealerPhone = "9284939947";
+        String encodedPassword = (demoDealerPassword != null && !demoDealerPassword.isBlank()) 
+                ? passwordEncoder.encode(demoDealerPassword) 
+                : null;
+
         return userService.findByPhone(dealerPhone)
             .flatMap(existingDealer -> {
                 existingDealer.setName("Swasthanand Dealer");
-                existingDealer.setPassword(passwordEncoder.encode("admin123"));
+                if (encodedPassword != null) {
+                    existingDealer.setPassword(encodedPassword);
+                }
                 existingDealer.setRole(User.Role.DEALER);
                 existingDealer.setIsApproved(true);
                 existingDealer.setStatus(User.UserStatus.ACTIVE);
@@ -82,7 +108,7 @@ public class DataInitializer implements CommandLineRunner {
             .switchIfEmpty(Mono.defer(() -> {
                 User dealer = User.builder()
                         .phone(dealerPhone)
-                        .password(passwordEncoder.encode("admin123"))
+                        .password(encodedPassword != null ? encodedPassword : "")
                         .name("Swasthanand Dealer")
                         .role(User.Role.DEALER)
                         .isApproved(true)
@@ -105,14 +131,6 @@ public class DataInitializer implements CommandLineRunner {
                         return dealershipNodeRepository.save(node);
                     }))
                     .then();
-            });
-    }
-
-    private Mono<Void> initializeAshishPassword() {
-        return userService.findByPhone("9876543210")
-            .flatMap(user -> {
-                user.setPassword(passwordEncoder.encode("Ashish123"));
-                return userService.updateUser(user).then();
             });
     }
 

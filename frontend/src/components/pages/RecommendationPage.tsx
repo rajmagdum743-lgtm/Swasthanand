@@ -12,10 +12,10 @@ import {
   Stethoscope,
   Timer,
   Info,
-  CheckCircle2
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
-import axios from 'axios';
-import { API_BASE_URL } from '../../config/api';
+import { CATALOG_RECOMMENDATIONS } from '../../data/adviserMockData';
 
 interface RecommendedProduct {
   id: string;
@@ -93,6 +93,7 @@ const DOSHA_QUESTIONS = [
 const RecommendationPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [hasConsented, setHasConsented] = useState(false);
   const [results, setResults] = useState<RecommendationResponse | null>(null);
   const [formData, setFormData] = useState({
     age: 30,
@@ -170,7 +171,7 @@ const RecommendationPage: React.FC = () => {
   const getDominantDoshaDesc = () => {
     const doshaValues = calculateDoshas();
     const dominant = Object.entries(doshaValues).reduce((a, b) => a[1] > b[1] ? a : b)[0];
-    
+
     switch (dominant) {
       case 'vata':
         return 'Dominant: Vata (Air & Space). You tend to be creative, active, and light on your feet, but are prone to anxiety, cold sensitivity, and dry skin when out of balance.';
@@ -185,24 +186,38 @@ const RecommendationPage: React.FC = () => {
 
   const handleSubmit = async () => {
     setLoading(true);
-    try {
-      const response = await axios.post(`${API_BASE_URL}/api/recommend`, {
-        age: formData.age,
-        weight: formData.weight,
-        height: formData.height,
-        goal: formData.goal,
-        diseases: formData.diseases,
-        allergies: formData.allergies,
-        activityLevel: formData.activityLevel
+
+    // Timed simulation of frontend recommendation calculation
+    setTimeout(() => {
+      const heightM = formData.height / 100;
+      const bmi = parseFloat((formData.weight / (heightM * heightM)).toFixed(1));
+      let bmiStatus = 'Normal Weight';
+      if (bmi < 18.5) bmiStatus = 'Underweight';
+      else if (bmi >= 25) bmiStatus = 'Overweight';
+
+      const mockProds: RecommendedProduct[] = CATALOG_RECOMMENDATIONS.slice(0, 3).map((item) => ({
+        id: item.id,
+        name: item.name,
+        expertBenefit: item.expertBenefit,
+        chosenReason: item.whyRecommended,
+        recoveryTimeline: item.recoveryTimeline,
+        usageInstructions: item.usageInstructions,
+        dosageCycle: item.dosageCycle,
+        image: item.image,
+      }));
+
+      setResults({
+        profileSummary: {
+          bmi,
+          bmiStatus,
+          ayurvedicInsight: `Your metabolic profile indicates a balanced Agni with focus on ${formData.goal.replace('-', ' ')}. We recommend pure herbal formulations to sustain cellular vigor.`,
+        },
+        recommendations: mockProds,
       });
-      setResults(response.data);
-      setStep(5);
-    } catch (error) {
-      console.error('Error fetching recommendations:', error);
-      alert('Failed to get recommendations. Please ensure the backend is running.');
-    } finally {
+
       setLoading(false);
-    }
+      setStep(5);
+    }, 1200);
   };
 
   const nextStep = () => setStep(prev => prev + 1);
@@ -259,7 +274,7 @@ const RecommendationPage: React.FC = () => {
                     <input
                       type="number"
                       value={formData.age}
-                      onChange={(e) => handleInputChange('age', parseInt(e.target.value))}
+                      onChange={(e) => handleInputChange('age', parseInt(e.target.value) || '')}
                       className="w-full p-4 rounded-2xl bg-white border border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100/50 transition-all text-lg font-bold outline-none"
                     />
                   </div>
@@ -268,7 +283,7 @@ const RecommendationPage: React.FC = () => {
                     <input
                       type="number"
                       value={formData.weight}
-                      onChange={(e) => handleInputChange('weight', parseInt(e.target.value))}
+                      onChange={(e) => handleInputChange('weight', parseInt(e.target.value) || '')}
                       className="w-full p-4 rounded-2xl bg-white border border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100/50 transition-all text-lg font-bold outline-none"
                     />
                   </div>
@@ -277,7 +292,7 @@ const RecommendationPage: React.FC = () => {
                     <input
                       type="number"
                       value={formData.height}
-                      onChange={(e) => handleInputChange('height', parseInt(e.target.value))}
+                      onChange={(e) => handleInputChange('height', parseInt(e.target.value) || '')}
                       className="w-full p-4 rounded-2xl bg-white border border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100/50 transition-all text-lg font-bold outline-none"
                     />
                   </div>
@@ -414,8 +429,8 @@ const RecommendationPage: React.FC = () => {
                     <Stethoscope size={24} />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Existing Conditions</h2>
-                    <p className="text-slate-500 font-medium">Select any conditions we should account for.</p>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Existing Conditions & Consent</h2>
+                    <p className="text-slate-500 font-medium">Select conditions and authorize health info consent.</p>
                   </div>
                 </div>
 
@@ -452,22 +467,19 @@ const RecommendationPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <label className="text-sm font-black text-slate-400 uppercase tracking-widest px-2">Activity Level</label>
-                  <div className="grid grid-cols-3 gap-4">
-                    {['sedentary', 'moderate', 'active'].map((level) => (
-                      <button
-                        key={level}
-                        onClick={() => handleInputChange('activityLevel', level)}
-                        className={`p-4 rounded-2xl font-bold text-sm capitalize transition-all border ${formData.activityLevel === level
-                          ? 'bg-slate-800 border-slate-900 text-white shadow-lg'
-                          : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'
-                        }`}
-                      >
-                        {level}
-                      </button>
-                    ))}
-                  </div>
+                {/* Consent Gate */}
+                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hasConsented}
+                      onChange={(e) => setHasConsented(e.target.checked)}
+                      className="mt-1 w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0 accent-emerald-600"
+                    />
+                    <span className="text-xs font-bold text-slate-700 leading-relaxed">
+                      I consent to the processing of my health information to generate personalized catalog recommendations.
+                    </span>
+                  </label>
                 </div>
 
                 <div className="flex justify-between pt-6">
@@ -477,7 +489,7 @@ const RecommendationPage: React.FC = () => {
                   </button>
                   <button
                     onClick={handleSubmit}
-                    disabled={loading}
+                    disabled={loading || !hasConsented}
                     className="btn-premium px-12 py-4 disabled:opacity-50 flex items-center gap-3"
                   >
                     {loading ? (

@@ -34,7 +34,6 @@ const HomePage: React.FC<HomePageProps> = ({
   const { isOffline, lastSynced, refreshProducts } = useProducts();
 
   const handleProductSelect = (productId: string) => {
-    console.log('Selecting product:', productId);
     setSelectedCategory('All');
     setHighlightedProductId(productId);
     
@@ -250,16 +249,34 @@ const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {filteredProducts.map((product) => (
-            <ProductCard 
-              key={product.id} 
-              {...product} 
-              onTrace={handleTraceOpen} 
-              isHighlighted={highlightedProductId === product.id}
-            />
-          ))}
-        </div>
+        {filteredProducts.length === 0 ? (
+          <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm max-w-lg mx-auto space-y-4">
+            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto">
+              <Leaf size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-800">No products found in this category</h3>
+              <p className="text-slate-500 text-sm font-medium mt-1">Try selecting another category or resetting the filter.</p>
+            </div>
+            <button
+              onClick={() => setSelectedCategory('All')}
+              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-full shadow-md transition-all cursor-pointer"
+            >
+              Show All Products
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {filteredProducts.map((product) => (
+              <ProductCard 
+                key={product.id} 
+                {...product} 
+                onTrace={handleTraceOpen} 
+                isHighlighted={highlightedProductId === product.id}
+              />
+            ))}
+          </div>
+        )}
       </section>
     </>
   );

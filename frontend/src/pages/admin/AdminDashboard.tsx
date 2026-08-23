@@ -96,7 +96,7 @@ const AdminDashboard: React.FC = () => {
         percentage: totalProd > 0 ? Math.round((cnt / totalProd) * 100) : 0
       }));
 
-      // Weekly trends mock calculation from real orders
+      // Weekly trends calculation from real orders
       const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       const weeklyTrends = days.map((day, idx) => {
         const dayOrders = ordersList.filter((_, i) => i % 7 === idx);

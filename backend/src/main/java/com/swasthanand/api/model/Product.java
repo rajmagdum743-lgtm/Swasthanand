@@ -61,7 +61,7 @@ public class Product implements Persistable<String> {
     private Integer stock = 100;
     
     @Builder.Default
-    private Boolean isApproved = false;
+    private Boolean isApproved = true;
     
     // Traceability & Origin specific fields
     private String harvestDate;

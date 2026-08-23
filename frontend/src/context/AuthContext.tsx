@@ -27,16 +27,12 @@ window.fetch = async (input, init) => {
     init.headers = headers;
   }
 
-  try {
-    const response = await originalFetch(input, init);
-    if ((response.status === 401 || response.status === 403) && token) {
-      localStorage.removeItem(SESSION_KEY);
-      window.location.href = '/';
-    }
-    return response;
-  } catch (err) {
-    throw err;
+  const response = await originalFetch(input, init);
+  if ((response.status === 401 || response.status === 403) && token) {
+    localStorage.removeItem(SESSION_KEY);
+    window.location.href = '/';
   }
+  return response;
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -95,32 +91,7 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MOCK_USERS: Record<string, User> = {
-  '9999999999': {
-    id: 'demo-1',
-    name: 'Demo Admin',
-    phone: '9999999999',
-    role: 'ADMIN',
-    addresses: [{
-      label: 'Main Office',
-      pincode: '415001',
-      state: 'Maharashtra',
-      district: 'Satara',
-      village: 'Satara City',
-      isDefault: true
-    }]
-  },
-  '9284993994': {
-    id: 'admin-2',
-    name: 'Swasthanand Admin',
-    phone: '9284993994',
-    role: 'ADMIN',
-    addresses: []
-  }
-};
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  console.log(MOCK_USERS); // Just to use it if you want to keep it, or remove it
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem(SESSION_KEY);
     if (!saved) return null;
@@ -138,9 +109,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
 
   const checkPhone = async (phone: string) => {
-    if (['9284993994', '9284939947', '9999999999'].includes(phone)) {
-      return true;
-    }
     try {
       const response = await fetchWithTimeout(`${API_BASE_URL}/api/auth/check-phone/${phone}`);
       if (!response.ok) return false;
@@ -218,18 +186,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { success: false, isRegistered: false };
     } catch (err: any) {
       console.error('Verify OTP error:', err);
-      const isConnectionError = err?.name === 'AbortError' || err instanceof TypeError || (err?.message && (err.message.toLowerCase().includes('connect') || err.message.toLowerCase().includes('network')));
-      if (isConnectionError && otp === '123456' && phone === '9284939947') {
-        const u: User = {
-          id: 'dealer-id',
-          name: 'Swasthanand Dealer',
-          phone: phone,
-          role: 'DEALER',
-          addresses: []
-        };
-        saveUserSession(u, 'mock-dealer-token');
-        return { success: true, isRegistered: true, user: u };
-      }
       return { success: false, isRegistered: false };
     }
   };
@@ -294,33 +250,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw err;
       }
 
-      // Check if it's a network/connection error
       const isConnectionError = err.name === 'AbortError' || err instanceof TypeError || (err.message && (err.message.toLowerCase().includes('connect') || err.message.toLowerCase().includes('network')));
-
-      if (isConnectionError && password === 'admin123') {
-        if (phone === '92849939947' || phone === '9999999999' || phone === '9284993994') {
-          const u: User = {
-            id: 'admin-id',
-            name: 'Swasthanand Admin',
-            phone: phone,
-            role: 'ADMIN',
-            addresses: []
-          };
-          saveUserSession(u, 'mock-admin-token');
-          return u;
-        }
-        if (phone === '9284939947') {
-          const u: User = {
-            id: 'dealer-id',
-            name: 'Swasthanand Dealer',
-            phone: phone,
-            role: 'DEALER',
-            addresses: []
-          };
-          saveUserSession(u, 'mock-dealer-token');
-          return u;
-        }
-      }
 
       if (err?.name === 'AbortError') {
         alert("Login timed out. Check your WiFi connection to your PC.");

@@ -77,7 +77,9 @@ const DealerInventory: React.FC = () => {
   // Stock history modal states
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
-  const [mockHistory, setMockHistory] = useState<any[]>([]);
+  const [historyList, setHistoryList] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
   // Product Traceability Edit Modal States
   const [traceOpen, setTraceOpen] = useState(false);
@@ -171,7 +173,7 @@ const DealerInventory: React.FC = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        setProducts(data.map((p: any) => ({ ...p, stock: p.stock ?? 100 })));
+        setProducts(data.map((p: any) => ({ ...p, stock: p.stock ?? 0 })));
       } else {
         setProducts([]);
       }
@@ -319,12 +321,30 @@ const DealerInventory: React.FC = () => {
     }
   };
 
-  const handleOpenHistory = (product: Product) => {
+  const handleOpenHistory = async (product: Product) => {
     setHistoryProduct(product);
-    setMockHistory([
-      { date: 'Initial Log', change: `${product.stock} Units`, reason: 'Dealer Inventory Setup', operator: 'Authorized Dealer' }
-    ]);
     setHistoryOpen(true);
+    setHistoryLoading(true);
+    setHistoryError('');
+    setHistoryList([]);
+
+    try {
+      const token = localStorage.getItem('swasthanand_token');
+      const res = await fetch(`${API_BASE_URL}/api/dealer/inventory/${product.id}/history`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryList(data);
+      } else {
+        setHistoryError('Failed to load inventory history from backend.');
+      }
+    } catch (err) {
+      console.error('Error fetching inventory history:', err);
+      setHistoryError('Network error while connecting to server.');
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const categories = ['All', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
@@ -513,8 +533,10 @@ const DealerInventory: React.FC = () => {
                   const sku = p.sku || `SW-${p.name.slice(0,3).toUpperCase()}`;
                   const isLow = p.stock < 15 && p.stock > 0;
                   const isEmpty = p.stock === 0;
-                  // Mock expiration warning (every 3rd item is marked as expiring soon for B2B demo)
-                  const isExpiringSoon = idx % 3 === 0;
+                  // Expiration warning based on real expiryDate field if present
+                  const isExpiringSoon = Boolean(
+                    p.expiryDate && new Date(p.expiryDate).getTime() <= (Date.now() + 30 * 24 * 60 * 60 * 1000)
+                  );
                   
                   return (
                     <motion.tr 
@@ -689,29 +711,48 @@ const DealerInventory: React.FC = () => {
               </div>
 
               {/* History Timeline */}
-              <div className="space-y-4">
-                {mockHistory.map((h, i) => {
-                  const isPlus = h.change.startsWith('+');
-                  return (
-                    <div key={i} className="flex items-start gap-3 text-xs border-b border-slate-100 dark:border-white/5 pb-3 last:border-0 last:pb-0">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
-                        isPlus 
-                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500' 
-                          : 'border-rose-500/20 bg-rose-500/10 text-rose-500'
-                      }`}>
-                        {isPlus ? <Plus size={12} /> : <Minus size={12} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center mb-0.5">
-                          <span className={`font-black ${isPlus ? 'text-emerald-500' : 'text-rose-500'}`}>{h.change}</span>
-                          <span className="text-[8px] text-slate-400 dark:text-slate-500 font-bold">{h.date}</span>
+              <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
+                {historyLoading ? (
+                  <div className="p-6 text-center text-xs text-slate-400 font-bold flex flex-col items-center justify-center gap-2">
+                    <Loader2 size={18} className="animate-spin text-emerald-500" /> Loading history from database...
+                  </div>
+                ) : historyError ? (
+                  <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/5 text-rose-500 text-xs font-bold text-center">
+                    {historyError}
+                  </div>
+                ) : historyList.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 font-bold">
+                    No inventory history available.
+                  </div>
+                ) : (
+                  historyList.map((h, i) => {
+                    const isPlus = (h.changeQuantity ?? 0) > 0;
+                    const changeStr = (h.changeQuantity ?? 0) > 0 ? `+${h.changeQuantity} Units` : `${h.changeQuantity} Units`;
+                    const dateStr = h.timestamp ? new Date(h.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+
+                    return (
+                      <div key={h.id || i} className="flex items-start gap-3 text-xs border-b border-slate-100 dark:border-white/5 pb-3 last:border-0 last:pb-0">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                          isPlus 
+                            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500' 
+                            : 'border-rose-500/20 bg-rose-500/10 text-rose-500'
+                        }`}>
+                          {isPlus ? <Plus size={12} /> : <Minus size={12} />}
                         </div>
-                        <p className="font-extrabold text-slate-700 dark:text-slate-300 leading-snug">{h.reason}</p>
-                        <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold mt-0.5">Operator: {h.operator}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-center mb-0.5">
+                            <span className={`font-black ${isPlus ? 'text-emerald-500' : 'text-rose-500'}`}>{changeStr}</span>
+                            <span className="text-[8px] text-slate-400 dark:text-slate-500 font-bold">{dateStr}</span>
+                          </div>
+                          <p className="font-extrabold text-slate-700 dark:text-slate-300 leading-snug">{h.reason || 'Stock Adjustment'}</p>
+                          <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                            Operator: {h.performedBy || 'Authorized Dealer'} {h.resultingStock !== undefined && `| Balance: ${h.resultingStock} Units`}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
 
               <button

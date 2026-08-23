@@ -86,7 +86,7 @@ const GoalSuggester: React.FC<GoalSuggesterProps> = ({ onProductSelect }) => {
                 <span className="gradient-text">Wellness Goal?</span>
               </h2>
               <p className="text-lg text-slate-500 font-medium leading-relaxed max-w-lg">
-                Describe your goal in natural language. We'll cross-reference your profile to find your perfect match.
+                Describe your goal. We'll cross-reference your profile to find your perfect match.
               </p>
             </div>
 

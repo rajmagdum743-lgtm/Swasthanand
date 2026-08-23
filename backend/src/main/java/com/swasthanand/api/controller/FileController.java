@@ -10,9 +10,14 @@ import java.nio.file.*;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import java.util.Set;
+
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
+
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "jpg", "jpeg", "png", "webp");
 
     @org.springframework.beans.factory.annotation.Value("${server.port:8081}")
     private String serverPort;
@@ -30,6 +35,7 @@ public class FileController {
     }
 
     @PostMapping("/upload")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DEALER')")
     public Mono<ResponseEntity<Object>> uploadFile(
             @RequestPart("file") FilePart filePart,
             @RequestParam(value = "productName", required = false) String productName,
@@ -45,7 +51,9 @@ public class FileController {
         if (i > 0) {
             extension = originalFilename.substring(i + 1).toLowerCase();
         }
-        if (extension.isEmpty()) extension = "pdf";
+        if (extension.isEmpty() || !ALLOWED_EXTENSIONS.contains(extension)) {
+            return Mono.just(ResponseEntity.badRequest().body((Object) Map.of("message", "Unsupported file type. Allowed types: pdf, jpg, jpeg, png, webp")));
+        }
 
         String baseName = "doc";
         if (productName != null && !productName.isBlank()) {

@@ -7,6 +7,7 @@ import com.swasthanand.api.repository.*;
 import com.swasthanand.api.service.TraceabilityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -108,6 +109,7 @@ public class TraceabilityController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'DEALER')")
     public Mono<FarmBatch> createBatch(@RequestBody FarmBatch batch) {
         return traceabilityService.saveBatch(batch);
     }

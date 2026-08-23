@@ -86,7 +86,7 @@ const AdminDealers: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    password: 'admin123',
+    password: '',
     pincode: '',
     state: '',
     district: '',
@@ -101,32 +101,6 @@ const AdminDealers: React.FC = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const SEED_DEALERS: User[] = [
-    {
-      id: 'dealer-seed-1',
-      name: 'Swasthanand Dealer',
-      phone: '9284939947',
-      role: 'DEALER',
-      isApproved: true,
-      status: 'ACTIVE',
-      addresses: [{
-        label: 'Main Depot',
-        pincode: '415001',
-        state: 'Maharashtra',
-        district: 'Satara',
-        village: 'Satara City',
-        isDefault: true
-      }],
-      dealershipNode: {
-        id: 'satara-coop-node-id',
-        name: 'Satara Agri-Coop Center',
-        latitude: 17.6805,
-        longitude: 73.9918,
-        geofenceRadiusKm: 5.0
-      }
-    }
-  ];
-
   const fetchDealers = async () => {
     try {
       setLoading(true);
@@ -136,21 +110,21 @@ const AdminDealers: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/api/admin/dealers`);
       if (res.ok) {
         const dealerUsers: User[] = await res.json();
-        setDealers(dealerUsers.length > 0 ? dealerUsers : SEED_DEALERS);
+        setDealers(dealerUsers);
       } else {
         // Fallback to /api/admin/users
         const fallbackRes = await fetch(`${API_BASE_URL}/api/admin/users`);
         if (fallbackRes.ok) {
           const users: User[] = await fallbackRes.json();
           const dealerList = users.filter(u => u.role === 'DEALER');
-          setDealers(dealerList.length > 0 ? dealerList : SEED_DEALERS);
+          setDealers(dealerList);
         } else {
-          setDealers(SEED_DEALERS);
+          setDealers([]);
         }
       }
     } catch (err) {
       console.error('Fetch dealers error:', err);
-      setDealers(SEED_DEALERS);
+      setDealers([]);
     } finally {
       setLoading(false);
     }
@@ -188,7 +162,7 @@ const AdminDealers: React.FC = () => {
     setFormData({
       name: '',
       phone: '',
-      password: 'admin123',
+      password: '',
       pincode: '',
       state: '',
       district: '',

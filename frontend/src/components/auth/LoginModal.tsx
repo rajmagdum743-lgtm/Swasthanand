@@ -262,7 +262,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, initialMode = 
         setStep(3);
       }
     } else {
-      setError('Invalid OTP. Please use 123456 for demo.');
+      setError('Invalid OTP. Please try again.');
     }
   };
 

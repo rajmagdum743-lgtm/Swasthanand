@@ -24,3 +24,4 @@ export const getImageUrl = (imagePath: string | null | undefined): string => {
   return `${base}${path}`;
 };
 
+export const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || '';

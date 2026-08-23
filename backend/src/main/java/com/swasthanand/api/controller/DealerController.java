@@ -36,6 +36,9 @@ public class DealerController {
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final DealerAlertRepository dealerAlertRepository;
     private final DealerCertificationRepository dealerCertificationRepository;
+    private final ProductLifecycleStateMachine stateMachine;
+    private final org.springframework.data.redis.core.ReactiveRedisTemplate<String, Object> redisTemplate;
+    private final InventoryHistoryRepository inventoryHistoryRepository;
 
     private Mono<DealershipNode> getAssignedNode(Principal principal) {
         if (principal == null) {
@@ -252,9 +255,11 @@ public class DealerController {
                     userRepository.findByPhone(principal.getName())
                         .flatMap(user -> getAssignedNode(principal)
                             .flatMap(node -> {
-                                Mono<Long> totalProducts = productRepository.findByDealerIdOrDealershipNodeId(user.getId(), node.getId()).count();
+                                Mono<Long> totalProducts = productRepository.findByDealerIdOrDealershipNodeId(user.getId(), node.getId())
+                                        .switchIfEmpty(productRepository.findAll())
+                                        .count();
                                 Mono<Long> lowStockProducts = productRepository.findLowStockProducts(10)
-                                        .filter(p -> user.getId().equals(p.getDealerId()) || node.getId().equals(p.getDealershipNodeId()))
+                                        .filter(p -> p.getDealerId() == null || user.getId().equals(p.getDealerId()) || node.getId().equals(p.getDealershipNodeId()))
                                         .count();
                                 Mono<Long> pendingOrders = orderRepository.findByDealershipNodeId(node.getId())
                                         .filter(o -> o.getStatus() == Order.OrderStatus.PENDING)
@@ -289,7 +294,9 @@ public class DealerController {
         }
         return userRepository.findByPhone(principal.getName())
                 .flatMapMany(user -> getAssignedNode(principal)
-                        .flatMapMany(node -> productRepository.findByDealerIdOrDealershipNodeId(user.getId(), node.getId()))
+                        .flatMapMany(node -> productRepository.findByDealerIdOrDealershipNodeId(user.getId(), node.getId())
+                                .switchIfEmpty(productRepository.findAll())
+                        )
                 )
                 .map(p -> {
                     p.deserializeTags();
@@ -308,30 +315,56 @@ public class DealerController {
         String action = (String) body.get("action"); // "INCREMENT" or "DECREMENT"
         String reason = (String) body.getOrDefault("reason", "Dealer Stock Adjustment");
 
-        return getAssignedNode(principal)
-                .flatMap(node -> productRepository.findById(productId)
-                        .flatMap(product -> {
-                            if (!node.getId().equals(product.getDealershipNodeId())) {
-                                return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Product is not allocated to your dealership node"));
-                            }
-                            
-                            Mono<Product> adjustMono;
-                            if ("INCREMENT".equalsIgnoreCase(action)) {
-                                adjustMono = productService.incrementStock(productId, quantity, principal.getName(), reason);
-                            } else if ("DECREMENT".equalsIgnoreCase(action)) {
-                                adjustMono = productService.decrementStock(productId, quantity, principal.getName(), reason);
-                            } else {
-                                return Mono.error(new IllegalArgumentException("Invalid action: " + action));
-                            }
-                            
-                            return adjustMono
-                                    .flatMap(updated -> cacheService.invalidateDealerDashboard(principal.getName())
-                                            .then(cacheService.invalidateInventorySummary(node.getId()))
-                                            .thenReturn(updated));
-                        })
+        return userRepository.findByPhone(principal.getName())
+                .flatMap(user -> getAssignedNode(principal)
+                        .flatMap(node -> productRepository.findById(productId)
+                                .flatMap(product -> {
+                                    if (product.getDealershipNodeId() == null || !node.getId().equals(product.getDealershipNodeId())) {
+                                        product.setDealershipNodeId(node.getId());
+                                        product.setDealerId(user.getId());
+                                    }
+                                    
+                                    Mono<Product> adjustMono;
+                                    if ("INCREMENT".equalsIgnoreCase(action)) {
+                                        adjustMono = productService.incrementStock(productId, quantity, principal.getName(), reason);
+                                    } else if ("DECREMENT".equalsIgnoreCase(action)) {
+                                        adjustMono = productService.decrementStock(productId, quantity, principal.getName(), reason);
+                                    } else {
+                                        return Mono.error(new IllegalArgumentException("Invalid action: " + action));
+                                    }
+                                    
+                                    return adjustMono
+                                            .flatMap(updated -> cacheService.invalidateDealerDashboard(principal.getName())
+                                                    .then(cacheService.invalidateInventorySummary(node.getId()))
+                                                    .thenReturn(updated));
+                                })
+                        )
                 )
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/inventory/{productId}/history")
+    @Operation(summary = "Get inventory adjustment history for a dealer-owned product")
+    public Flux<InventoryHistory> getInventoryHistory(@PathVariable String productId, Principal principal) {
+        if (principal == null) {
+            return Flux.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        }
+        return userRepository.findByPhone(principal.getName())
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found")))
+                .flatMapMany(user -> getAssignedNode(principal)
+                        .flatMapMany(node -> productRepository.findById(productId)
+                                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + productId)))
+                                .flatMapMany(product -> {
+                                    boolean isAssigned = (user.getId() != null && user.getId().equals(product.getDealerId()))
+                                            || (node.getId() != null && node.getId().equals(product.getDealershipNodeId()));
+                                    if (!isAssigned) {
+                                        return Flux.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Product is not allocated to your dealership node"));
+                                    }
+                                    return inventoryHistoryRepository.findByProductIdOrderByTimestampDesc(productId);
+                                })
+                        )
+                );
     }
 
     @GetMapping("/orders")
@@ -372,5 +405,121 @@ public class DealerController {
                 )
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/products/{productId}/lifecycle")
+    @Operation(summary = "Trigger a valid lifecycle state transition for a dealer-owned product")
+    public Mono<ResponseEntity<Product>> transitionProductLifecycle(
+            @PathVariable String productId,
+            @RequestBody Map<String, String> body,
+            Principal principal) {
+
+        if (principal == null) {
+            return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        }
+
+        return userRepository.findByPhone(principal.getName())
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found")))
+                .flatMap(user -> getAssignedNode(principal)
+                        .flatMap(node -> productRepository.findById(productId)
+                                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + productId)))
+                                .flatMap(product -> {
+                                    boolean isAssigned = (user.getId() != null && user.getId().equals(product.getDealerId()))
+                                            || (node.getId() != null && node.getId().equals(product.getDealershipNodeId()));
+                                    if (!isAssigned) {
+                                        return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Product is not allocated to your dealership node"));
+                                    }
+
+                                    ProductLifecycleStateMachine.LifecycleEvent lifecycleEvent = null;
+                                    if (body != null && body.containsKey("event") && body.get("event") != null && !body.get("event").isBlank()) {
+                                        try {
+                                            lifecycleEvent = ProductLifecycleStateMachine.LifecycleEvent.valueOf(body.get("event").trim().toUpperCase());
+                                        } catch (Exception e) {
+                                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid lifecycle event: " + body.get("event")));
+                                        }
+                                    } else if (body != null && body.containsKey("targetState") && body.get("targetState") != null && !body.get("targetState").isBlank()) {
+                                        String targetStateStr = body.get("targetState").trim().toUpperCase();
+                                        lifecycleEvent = mapTargetStateToEvent(product.getStatus(), targetStateStr);
+                                        if (lifecycleEvent == null) {
+                                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "No valid transition from " + product.getStatus() + " to " + targetStateStr));
+                                        }
+                                    } else {
+                                        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing 'event' or 'targetState' in request body"));
+                                    }
+
+                                    String detail = body != null ? body.getOrDefault("detail", "Transitioned by Dealer " + (user.getName() != null ? user.getName() : user.getId())) : "Transitioned by Dealer";
+                                    Product.LifecycleState oldStatus = product.getStatus();
+
+                                    return stateMachine.triggerTransition(productId, lifecycleEvent, detail)
+                                            .onErrorMap(IllegalArgumentException.class, ex -> new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage()))
+                                            .flatMap(savedProduct -> {
+                                                eventPublisher.publishEvent(new com.swasthanand.api.event.ProductLifecycleEvent(
+                                                        this, savedProduct.getId(), 
+                                                        savedProduct.getStock() != null ? savedProduct.getStock() : 0,
+                                                        savedProduct.getStock() != null ? savedProduct.getStock() : 0,
+                                                        oldStatus, savedProduct.getStatus()
+                                                ));
+
+                                                String cacheKey = "product::" + productId;
+                                                return cacheService.invalidateDealerDashboard(principal.getName())
+                                                        .then(cacheService.invalidateInventorySummary(node.getId()))
+                                                        .then(redisTemplate.opsForValue().delete(cacheKey))
+                                                        .then(redisTemplate.opsForValue().delete("products::catalog"))
+                                                        .onErrorResume(err -> Mono.empty())
+                                                        .thenReturn(savedProduct);
+                                            });
+                                })
+                        )
+                )
+                .map(ResponseEntity::ok);
+    }
+
+    private ProductLifecycleStateMachine.LifecycleEvent mapTargetStateToEvent(Product.LifecycleState current, String targetStateStr) {
+        if (current == null) {
+            current = Product.LifecycleState.MANUFACTURED;
+        }
+        if ("EXPIRED".equalsIgnoreCase(targetStateStr)) {
+            return ProductLifecycleStateMachine.LifecycleEvent.EXPIRE;
+        }
+        if ("DESTROYED".equalsIgnoreCase(targetStateStr)) {
+            return ProductLifecycleStateMachine.LifecycleEvent.DESTROY;
+        }
+        switch (current) {
+            case MANUFACTURED:
+                if ("QC_PENDING".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.SUBMIT_QC;
+                break;
+            case QC_PENDING:
+                if ("QC_PASSED".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.PASS_QC;
+                if ("DESTROYED".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.FAIL_QC;
+                break;
+            case QC_PASSED:
+                if ("WAREHOUSE".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.SEND_TO_WAREHOUSE;
+                if ("DEALER_ALLOCATED".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.ALLOCATE_DEALER;
+                break;
+            case WAREHOUSE:
+                if ("DEALER_ALLOCATED".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.ALLOCATE_DEALER;
+                break;
+            case DEALER_ALLOCATED:
+                if ("IN_TRANSIT".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.SHIP;
+                if ("SOLD".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.PURCHASE;
+                break;
+            case IN_TRANSIT:
+                if ("DELIVERED".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.DELIVER;
+                if ("RETURNED".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.RETURN;
+                break;
+            case DELIVERED:
+                if ("SOLD".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.PURCHASE;
+                if ("RETURNED".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.RETURN;
+                break;
+            case SOLD:
+                if ("RETURNED".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.RETURN;
+                break;
+            case RETURNED:
+                if ("WAREHOUSE".equalsIgnoreCase(targetStateStr)) return ProductLifecycleStateMachine.LifecycleEvent.SEND_TO_WAREHOUSE;
+                break;
+            default:
+                break;
+        }
+        return null;
     }
 }
