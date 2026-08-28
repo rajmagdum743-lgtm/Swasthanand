@@ -14,7 +14,8 @@ import {
   X,
   User as UserIcon,
   Bell,
-  Activity
+  Activity,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import PasswordInput from '../components/common/PasswordInput';
@@ -164,7 +165,8 @@ const AdminLayout: React.FC = () => {
     { path: '/admin/products', label: 'Products', icon: Package, desc: 'Inventory catalog' },
     { path: '/admin/orders', label: 'Orders', icon: ShoppingBag, desc: 'All transactions' },
     { path: '/admin/dealers', label: 'Dealers', icon: Building2, desc: 'Warehouse nodes' },
-    { path: '/admin/customers', label: 'Customers', icon: Users, desc: 'Consumer management' }
+    { path: '/admin/customers', label: 'Customers', icon: Users, desc: 'Consumer management' },
+    { path: '/admin/feedback', label: 'Feedback', icon: MessageSquare, desc: 'FR5 Review' },
   ];
 
   const notifications = [

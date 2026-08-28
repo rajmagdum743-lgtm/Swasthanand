@@ -52,6 +52,10 @@ const Header: React.FC<HeaderProps> = ({ onOpenCart, onOpenLogin, onOpenRegister
             Contact Us
             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-500 group-hover:w-full transition-all duration-300"></span>
           </Link>
+          <Link to="/feedback" className="hover:text-emerald-600 transition-all relative group">
+            Feedback
+            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-500 group-hover:w-full transition-all duration-300"></span>
+          </Link>
           {isAuthenticated && (user?.role === 'DEALER' || user?.role === 'ADMIN') && (
             <Link to={user?.role === 'ADMIN' ? "/admin/dashboard" : "/dealer/dashboard"} className="text-amber-600 hover:text-amber-700 font-extrabold transition-all relative group flex items-center gap-1">
               {user?.role === 'ADMIN' ? "Admin Panel" : "Dealer Portal"}
