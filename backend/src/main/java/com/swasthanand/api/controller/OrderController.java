@@ -13,6 +13,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.security.Principal;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
@@ -55,11 +57,21 @@ public class OrderController {
     }
 
     @GetMapping("/user/{userId}")
-    public Flux<Order> getOrdersByUser(@PathVariable String userId) {
-        return orderService.getOrdersByUser(userId);
+    public Flux<Order> getOrdersByUser(@PathVariable String userId, Principal principal) {
+        if (principal == null) {
+            return Flux.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        }
+        return userRepository.findByPhone(principal.getName())
+                .flatMapMany(user -> {
+                    if (user.getRole() == com.swasthanand.api.model.User.Role.ADMIN || user.getId().equals(userId)) {
+                        return orderService.getOrdersByUser(userId);
+                    }
+                    return Flux.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to orders for this user"));
+                });
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public Flux<Order> getAllOrders() {
         return orderService.getAllOrders();
     }

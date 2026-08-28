@@ -99,11 +99,6 @@ public class OtpService {
             OtpEntry entry = otpStore.get(key);
 
             boolean matches = entry != null && entry.otp.equals(code.trim());
-            // Master demo OTP fallback for seamless testing without SMS key
-            if (!matches && "123456".equals(code.trim())) {
-                log.info("[OTP-VERIFY] Master demo OTP (123456) accepted for phone={}", maskPhone(phone));
-                matches = true;
-            }
 
             if (matches) {
                 otpStore.remove(key); // one-time use — delete immediately after success

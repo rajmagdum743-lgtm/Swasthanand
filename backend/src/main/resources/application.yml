@@ -25,6 +25,10 @@ server:
   shutdown: graceful
 
 app:
+  demo-data:
+    enabled: ${DEMO_DATA_ENABLED:false}
+    admin-password: ${DEMO_ADMIN_PASSWORD:}
+    dealer-password: ${DEMO_DEALER_PASSWORD:}
   jwt:
     secret: ${JWT_SECRET:SwasthanandSuperSecretKeyForJWTAuthTokenSigning1234567890!@#$}
 

@@ -14,12 +14,14 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import com.swasthanand.api.model.DealerCertification;
 import com.swasthanand.api.repository.DealerCertificationRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
 import reactor.core.publisher.Mono;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
     private final UserRepository userRepository;
@@ -138,8 +140,13 @@ public class AdminController {
     public Mono<ResponseEntity<Object>> createUser(@RequestBody Map<String, Object> body) {
         String phone = (String) body.get("phone");
         String name = (String) body.get("name");
-        String password = (String) body.getOrDefault("password", "admin123");
+        String password = (String) body.get("password");
         String roleStr = (String) body.getOrDefault("role", "CUSTOMER");
+
+        if (password == null || password.isBlank()) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body((Object) Map.of("message", "Password is required for user creation.")));
+        }
 
         return userRepository.findByPhone(phone)
                 .flatMap(existing -> Mono.just(ResponseEntity.badRequest()

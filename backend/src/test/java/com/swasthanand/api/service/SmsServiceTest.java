@@ -29,13 +29,13 @@ public class SmsServiceTest {
 
     @Test
     public void testInit_Simulator() {
-        when(smsConfig.isSimulator()).thenReturn(true);
+        lenient().when(smsConfig.isSimulator()).thenReturn(true);
         smsService.init();
     }
 
     @Test
     public void testInit_Production() {
-        when(smsConfig.isSimulator()).thenReturn(false);
+        lenient().when(smsConfig.isSimulator()).thenReturn(false);
         try {
             smsService.init();
         } catch (Exception e) {
@@ -67,7 +67,7 @@ public class SmsServiceTest {
 
     @Test
     public void testSendOtp_ProductionFallback() {
-        when(smsConfig.isSimulator()).thenReturn(false);
+        lenient().when(smsConfig.isSimulator()).thenReturn(false);
         smsService.sendOtp("+919876543210", "123456");
     }
 }

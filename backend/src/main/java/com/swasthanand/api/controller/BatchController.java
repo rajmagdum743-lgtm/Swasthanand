@@ -19,6 +19,8 @@ import reactor.core.publisher.Mono;
 public class BatchController {
 
     private final BatchService batchService;
+    private final com.swasthanand.api.repository.UserRepository userRepository;
+    private final com.swasthanand.api.repository.DealershipNodeRepository dealershipNodeRepository;
 
     @GetMapping("/{id}")
     @Operation(summary = "Get batch by ID")
@@ -36,8 +38,23 @@ public class BatchController {
 
     @GetMapping("/dealer/{dealerId}")
     @Operation(summary = "Get batches allocated to a dealer/node")
-    public Flux<Batch> getBatchesByDealer(@PathVariable String dealerId) {
-        return batchService.getBatchesByDealerAllocation(dealerId);
+    public Flux<Batch> getBatchesByDealer(@PathVariable String dealerId, java.security.Principal principal) {
+        if (principal == null) {
+            return Flux.error(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
+        }
+        return userRepository.findByPhone(principal.getName())
+                .flatMapMany(user -> {
+                    if (user.getRole() == com.swasthanand.api.model.User.Role.ADMIN || user.getId().equals(dealerId)) {
+                        return batchService.getBatchesByDealerAllocation(dealerId);
+                    }
+                    return dealershipNodeRepository.findByAssignedDealerId(user.getId())
+                            .flatMapMany(node -> {
+                                if (node.getId().equals(dealerId)) {
+                                    return batchService.getBatchesByDealerAllocation(dealerId);
+                                }
+                                return Flux.error(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Access denied to batches for this dealer"));
+                            });
+                });
     }
 
     @PostMapping
