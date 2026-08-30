@@ -9,9 +9,9 @@ import { useProducts } from './context/ProductContext';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import HomePage from './components/pages/HomePage';
 import ContactPage from './components/pages/ContactPage';
-import RecommendationPage from './components/pages/RecommendationPage';
 import TraceabilityPage from './components/pages/TraceabilityPage';
 import HowItWorksPage from './components/pages/HowItWorksPage';
+import CustomerFeedbackPage from './components/pages/CustomerFeedbackPage';
 
 // Admin layout and pages
 import AdminLayout from './layouts/AdminLayout';
@@ -20,6 +20,7 @@ import AdminProducts from './pages/admin/AdminProducts';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminDealers from './pages/admin/AdminDealers';
 import AdminCustomers from './pages/admin/AdminCustomers';
+import AdminFeedback from './pages/admin/AdminFeedback';
 
 // Dealer layout and pages
 import DealerLayout from './layouts/DealerLayout';
@@ -30,6 +31,7 @@ import DealerTraceability from './pages/dealer/DealerTraceability';
 import DealerLifecycle from './pages/dealer/DealerLifecycle';
 import DealerNotifications from './pages/dealer/DealerNotifications';
 import DealerProfile from './pages/dealer/DealerProfile';
+import DealerFeedback from './pages/dealer/DealerFeedback';
 
 function App() {
   const { isAuthenticated, user } = useAuth();
@@ -99,6 +101,7 @@ function App() {
           <Route path="lifecycle" element={<DealerLifecycle />} />
           <Route path="notifications" element={<DealerNotifications />} />
           <Route path="profile" element={<DealerProfile />} />
+          <Route path="feedback" element={<DealerFeedback />} />
           <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Route>
       </Routes>
@@ -116,6 +119,7 @@ function App() {
           <Route path="orders" element={<AdminOrders />} />
           <Route path="dealers" element={<AdminDealers />} />
           <Route path="customers" element={<AdminCustomers />} />
+          <Route path="feedback" element={<AdminFeedback />} />
           <Route path="login" element={<AdminDashboard />} />
           <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Route>
@@ -166,7 +170,7 @@ function App() {
             />
           } />
           <Route path="/contact" element={<ContactPage />} />
-          <Route path="/recommend" element={<RecommendationPage />} />
+          <Route path="/feedback" element={<CustomerFeedbackPage />} />
           <Route path="/traceability" element={<TraceabilityPage />} />
           <Route path="/traceability/:batchId" element={<TraceabilityPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />

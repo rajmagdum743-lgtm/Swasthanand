@@ -18,7 +18,8 @@ import {
   MapPin,
   Sun,
   Moon,
-  ClipboardList
+  ClipboardList,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { API_BASE_URL } from '../config/api';
@@ -157,7 +158,8 @@ const DealerLayout: React.FC = () => {
     { path: '/dealer/orders', label: 'B2B Procurement', icon: TrendingUp, badge: pendingOrdersCount ? String(pendingOrdersCount) : null, desc: 'Purchase Requests' },
     { path: '/dealer/traceability', label: 'Batch Traceability', icon: Search, badge: null, desc: 'Farm to Depot' },
     { path: '/dealer/notifications', label: 'Admin Alerts', icon: Bell, badge: unreadAlertsCount ? String(unreadAlertsCount) : null, desc: 'Messages' },
-    { path: '/dealer/profile', label: 'Supplier Profile', icon: UserIcon, badge: null, desc: 'Node Settings' }
+    { path: '/dealer/profile', label: 'Supplier Profile', icon: UserIcon, badge: null, desc: 'Node Settings' },
+    { path: '/dealer/feedback', label: 'Feedback', icon: MessageSquare, badge: null, desc: 'Share Experience' },
   ];
 
   const notifications: { title: string; desc: string; time: string; color: string }[] = [
